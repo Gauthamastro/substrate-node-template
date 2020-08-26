@@ -1,9 +1,10 @@
 use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
+	AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
 	SudoConfig, SystemConfig, WASM_BINARY, Signature
 };
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+// use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_babe::{AuthorityId as BabeId};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{Verify, IdentifyAccount};
 use sc_service::ChainType;
@@ -31,9 +32,9 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 }
 
 /// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
+pub fn authority_keys_from_seed(s: &str) -> (BabeId, GrandpaId) {
 	(
-		get_from_seed::<AuraId>(s),
+		get_from_seed::<BabeId>(s),
 		get_from_seed::<GrandpaId>(s),
 	)
 }
@@ -49,7 +50,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		ChainType::Development,
 		move || testnet_genesis(
 			wasm_binary,
-			// Initial PoA authorities
+			// Initial Babe authorities
 			vec![
 				authority_keys_from_seed("Alice"),
 			],
@@ -88,7 +89,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		ChainType::Local,
 		move || testnet_genesis(
 			wasm_binary,
-			// Initial PoA authorities
+			// Initial Babe authorities
 			vec![
 				authority_keys_from_seed("Alice"),
 				authority_keys_from_seed("Bob"),
@@ -143,7 +144,7 @@ fn testnet_genesis(
 			// Configure endowed accounts with initial balance of 1 << 60.
 			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
 		}),
-		pallet_aura: Some(AuraConfig {
+		pallet_babe: Some(BabeConfig {
 			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
 		}),
 		pallet_grandpa: Some(GrandpaConfig {
