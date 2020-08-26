@@ -276,13 +276,33 @@ pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
 	let finality_proof_request_builder =
 		finality_proof_import.create_finality_proof_request_builder();
 
-	let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair, _, _>(
-		sc_consensus_aura::slot_duration(&*client)?,
+	// let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair, _, _>(
+	// 	sc_consensus_aura::slot_duration(&*client)?,
+	// 	grandpa_block_import,
+	// 	None,
+	// 	Some(Box::new(finality_proof_import)),
+	// 	client.clone(),
+	// 	InherentDataProviders::new(),
+	// 	&task_manager.spawn_handle(),
+	// 	config.prometheus_registry(),
+	// 	sp_consensus::NeverCanAuthor,
+	// )?;
+	let (babe_block_import, babe_link) = sc_consensus_babe::block_import(
+		sc_consensus_babe::Config::get_or_compute(&*client)?,
 		grandpa_block_import,
+		client.clone(),
+	)?;
+
+	let inherent_data_providers = sp_inherents::InherentDataProviders::new();
+
+	let import_queue = sc_consensus_babe::import_queue(
+		babe_link,
+		babe_block_import,
 		None,
 		Some(Box::new(finality_proof_import)),
 		client.clone(),
-		InherentDataProviders::new(),
+		select_chain.clone(),
+		inherent_data_providers.clone(),
 		&task_manager.spawn_handle(),
 		config.prometheus_registry(),
 		sp_consensus::NeverCanAuthor,
