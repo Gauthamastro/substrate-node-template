@@ -1,12 +1,15 @@
 use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature
+	AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
+	SudoConfig, SystemConfig, WASM_BINARY, Signature, SessionConfig, StakingConfig, StakerStatus,
+	opaque::SessionKeys, Balance
 };
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+// use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_consensus_babe::{AuthorityId as BabeId};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{Verify, IdentifyAccount};
 use sc_service::ChainType;
+use sp_runtime::{Perbill};
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -30,11 +33,13 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
+/// Generate an Babe authority key.
+pub fn authority_keys_from_seed(s: &str) -> (BabeId, GrandpaId, AccountId, AccountId) {
 	(
-		get_from_seed::<AuraId>(s),
+		get_from_seed::<BabeId>(s),
 		get_from_seed::<GrandpaId>(s),
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", s)),
+		get_account_id_from_seed::<sr25519::Public>(s)
 	)
 }
 
@@ -49,7 +54,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		ChainType::Development,
 		move || testnet_genesis(
 			wasm_binary,
-			// Initial PoA authorities
+			// Initial Babe authorities
 			vec![
 				authority_keys_from_seed("Alice"),
 			],
@@ -88,7 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		ChainType::Local,
 		move || testnet_genesis(
 			wasm_binary,
-			// Initial PoA authorities
+			// Initial Babe authorities
 			vec![
 				authority_keys_from_seed("Alice"),
 				authority_keys_from_seed("Bob"),
@@ -128,11 +133,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	initial_authorities: Vec<(AuraId, GrandpaId)>,
+	initial_authorities: Vec<(BabeId, GrandpaId, AccountId,AccountId)>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> GenesisConfig {
+	const STASH: Balance = 100;
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
 			// Add Wasm runtime to storage.
@@ -143,15 +149,43 @@ fn testnet_genesis(
 			// Configure endowed accounts with initial balance of 1 << 60.
 			balances: endowed_accounts.iter().cloned().map(|k|(k, 1 << 60)).collect(),
 		}),
-		pallet_aura: Some(AuraConfig {
-			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+		pallet_babe: Some(BabeConfig {
+			// authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
+			authorities: vec![],
 		}),
 		pallet_grandpa: Some(GrandpaConfig {
-			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+			// authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+			authorities: vec![],
 		}),
 		pallet_sudo: Some(SudoConfig {
 			// Assign network admin rights.
 			key: root_key,
 		}),
+		pallet_session: Some(SessionConfig {
+			keys: initial_authorities.iter().map(|x| {
+				(x.2.clone(), x.2.clone(), session_keys(
+					x.1.clone(),
+					x.0.clone()
+				))
+			}).collect::<Vec<_>>(),
+		}),
+		pallet_staking: Some(StakingConfig {
+			validator_count: initial_authorities.len() as u32 * 2,
+			minimum_validator_count: initial_authorities.len() as u32,
+			stakers: initial_authorities.iter().map(|x| {
+				(x.2.clone(), x.3.clone(), STASH, StakerStatus::Validator)
+			}).collect(),
+			invulnerables: initial_authorities.iter().map(|x| x.2.clone()).collect(),
+			slash_reward_fraction: Perbill::from_percent(10),
+			.. Default::default()
+		}),
 	}
 }
+
+fn session_keys(
+	grandpa: GrandpaId,
+	babe: BabeId,
+) -> SessionKeys {
+	SessionKeys { grandpa, babe  }
+}
+
