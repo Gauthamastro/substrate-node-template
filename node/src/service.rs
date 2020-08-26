@@ -8,7 +8,8 @@ use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_inherents::InherentDataProviders;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
-use sp_consensus_aura::sr25519::{AuthorityPair as AuraPair};
+// use sp_consensus_aura::sr25519::{AuthorityPair as AuraPair};
+use sc_consensus_babe;
 use sc_finality_grandpa::{FinalityProofProvider as GrandpaFinalityProofProvider, SharedVoterState};
 
 // Our native executor instance.
@@ -27,8 +28,9 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 	sp_consensus::DefaultImportQueue<Block, FullClient>,
 	sc_transaction_pool::FullPool<Block, FullClient>,
 	(
-		sc_finality_grandpa::GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
-		sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>
+		sc_consensus_babe::BabeBlockImport<Block, FullClient, FullGrandpaBlockImport>,
+		sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+		sc_consensus_babe::BabeLink<Block>,
 	)
 >, ServiceError> {
 	let inherent_data_providers = sp_inherents::InherentDataProviders::new();
@@ -50,16 +52,35 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 		client.clone(), &(client.clone() as Arc<_>), select_chain.clone(),
 	)?;
 
-	let aura_block_import = sc_consensus_aura::AuraBlockImport::<_, _, _, AuraPair>::new(
-		grandpa_block_import.clone(), client.clone(),
-	);
+	// let aura_block_import = sc_consensus_aura::AuraBlockImport::<_, _, _, AuraPair>::new(
+	// 	grandpa_block_import.clone(), client.clone(),
+	// );
 
-	let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair, _, _>(
-		sc_consensus_aura::slot_duration(&*client)?,
-		aura_block_import,
-		Some(Box::new(grandpa_block_import.clone())),
+	let (block_import, babe_link) = sc_consensus_babe::block_import(
+		sc_consensus_babe::Config::get_or_compute(&*client)?,
+		grandpa_block_import,
+		client.clone(),
+	)?;
+
+	// let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair, _, _>(
+	// 	sc_consensus_aura::slot_duration(&*client)?,
+	// 	aura_block_import,
+	// 	Some(Box::new(grandpa_block_import.clone())),
+	// 	None,
+	// 	client.clone(),
+	// 	inherent_data_providers.clone(),
+	// 	&task_manager.spawn_handle(),
+	// 	config.prometheus_registry(),
+	// 	sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
+	// )?;
+
+	let import_queue = sc_consensus_babe::import_queue(
+		babe_link.clone(),
+		block_import.clone(),
+		Some(Box::new(justification_import)),
 		None,
 		client.clone(),
+		select_chain.clone(),
 		inherent_data_providers.clone(),
 		&task_manager.spawn_handle(),
 		config.prometheus_registry(),
@@ -69,7 +90,7 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 	Ok(sc_service::PartialComponents {
 		client, backend, task_manager, import_queue, keystore, select_chain, transaction_pool,
 		inherent_data_providers,
-		other: (grandpa_block_import, grandpa_link),
+		other: (block_import, grandpa_link,babe_link),
 	})
 }
 
@@ -78,7 +99,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client, backend, mut task_manager, import_queue, keystore, select_chain, transaction_pool,
 		inherent_data_providers,
-		other: (block_import, grandpa_link),
+		other: (block_import, grandpa_link,babe_link),
 	} = new_partial(&config)?;
 
 	let finality_proof_provider =
@@ -148,22 +169,36 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 		let can_author_with =
 			sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone());
 
-		let aura = sc_consensus_aura::start_aura::<_, _, _, _, _, AuraPair, _, _, _>(
-			sc_consensus_aura::slot_duration(&*client)?,
-			client.clone(),
+		// let aura = sc_consensus_aura::start_aura::<_, _, _, _, _, AuraPair, _, _, _>(
+		// 	sc_consensus_aura::slot_duration(&*client)?,
+		// 	client.clone(),
+		// 	select_chain,
+		// 	block_import,
+		// 	proposer,
+		// 	network.clone(),
+		// 	inherent_data_providers.clone(),
+		// 	force_authoring,
+		// 	keystore.clone(),
+		// 	can_author_with,
+		// )?;
+		let babe_config = sc_consensus_babe::BabeParams {
+			keystore: keystore.clone(),
+			client: client.clone(),
 			select_chain,
+			env: proposer,
 			block_import,
-			proposer,
-			network.clone(),
-			inherent_data_providers.clone(),
+			sync_oracle: network.clone(),
+			inherent_data_providers: inherent_data_providers.clone(),
 			force_authoring,
-			keystore.clone(),
+			babe_link,
 			can_author_with,
-		)?;
+		};
+
+		let babe = sc_consensus_babe::start_babe(babe_config)?;
 
 		// the AURA authoring task is considered essential, i.e. if it
 		// fails we take down the service with it.
-		task_manager.spawn_essential_handle().spawn_blocking("aura", aura);
+		task_manager.spawn_essential_handle().spawn_blocking("babe-proposer", babe);
 	}
 
 	// if the node isn't actively participating in consensus then it doesn't
