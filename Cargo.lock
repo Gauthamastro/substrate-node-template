@@ -3330,6 +3330,7 @@ dependencies = [
  "sp-offchain",
  "sp-runtime",
  "sp-session",
+ "sp-staking",
  "sp-std",
  "sp-transaction-pool",
  "sp-version",
@@ -3618,6 +3619,7 @@ dependencies = [
  "pallet-authorship",
  "pallet-session",
  "parity-scale-codec",
+ "serde",
  "sp-application-crypto",
  "sp-io",
  "sp-npos-elections",
@@ -6256,6 +6258,7 @@ version = "2.0.0-rc6"
 source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc6#be8bb186d87b9d2b47a2907c9b51ae1e252362c3"
 dependencies = [
  "parity-scale-codec",
+ "serde",
  "sp-arithmetic",
  "sp-npos-elections-compact",
  "sp-std",

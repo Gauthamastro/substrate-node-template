@@ -17,10 +17,12 @@ use sp_runtime::traits::{
 };
 use sp_api::impl_runtime_apis;
 // use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-
+use sp_runtime::curve::PiecewiseLinear;
 use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
 use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
+use frame_system::{EnsureRoot};
+use sp_runtime::transaction_validity::{ TransactionPriority};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -117,6 +119,11 @@ pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
 
+// Some BABE-specific stuff
+// 1 in 4 blocks (on average, not counting collisions) will be primary babe blocks.
+pub const PRIMARY_PROBABILITY: (u64, u64) = (1, 4);
+pub const EPOCH_DURATION_IN_BLOCKS: u32 = 10 * MINUTES;
+
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
@@ -202,6 +209,12 @@ impl frame_system::Trait for Runtime {
 // impl pallet_aura::Trait for Runtime {
 // 	type AuthorityId = AuraId;
 // }
+
+parameter_types! {
+	pub const EpochDuration: u64 = EPOCH_DURATION_IN_BLOCKS as u64;
+	pub const ExpectedBlockTime: u64 = MILLISECS_PER_BLOCK;
+}
+
 impl pallet_babe::Trait for Runtime {
 	type EpochDuration = EpochDuration;
 	type ExpectedBlockTime = ExpectedBlockTime;
@@ -219,7 +232,7 @@ impl pallet_babe::Trait for Runtime {
 		pallet_babe::AuthorityId,
 	)>>::IdentificationTuple;
 
-	type HandleEquivocation = ()
+	type HandleEquivocation = ();
 	// pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences>;
 }
 

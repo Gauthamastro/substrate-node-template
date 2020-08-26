@@ -5,7 +5,6 @@ use std::time::Duration;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use node_template_runtime::{self, opaque::Block, RuntimeApi};
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
-use sp_inherents::InherentDataProviders;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
 // use sp_consensus_aura::sr25519::{AuthorityPair as AuraPair};
@@ -22,6 +21,8 @@ native_executor_instance!(
 type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
+type FullGrandpaBlockImport =
+sc_finality_grandpa::GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>;
 
 pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponents<
 	FullClient, FullBackend, FullSelectChain,
@@ -52,6 +53,7 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 		client.clone(), &(client.clone() as Arc<_>), select_chain.clone(),
 	)?;
 
+	let justification_import = grandpa_block_import.clone();
 	// let aura_block_import = sc_consensus_aura::AuraBlockImport::<_, _, _, AuraPair>::new(
 	// 	grandpa_block_import.clone(), client.clone(),
 	// );
@@ -267,6 +269,8 @@ pub fn new_light(config: Configuration) -> Result<TaskManager, ServiceError> {
 		client.clone(),
 		on_demand.clone(),
 	));
+
+	let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
 	let grandpa_block_import = sc_finality_grandpa::light_block_import(
 		client.clone(), backend.clone(), &(client.clone() as Arc<_>),

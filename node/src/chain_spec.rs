@@ -2,7 +2,7 @@ use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
 	SudoConfig, SystemConfig, WASM_BINARY, Signature, SessionConfig, StakingConfig, StakerStatus,
-	opaque::SessionKeys,
+	opaque::SessionKeys, Balance
 };
 // use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_babe::{AuthorityId as BabeId};
@@ -38,8 +38,8 @@ pub fn authority_keys_from_seed(s: &str) -> (BabeId, GrandpaId, AccountId, Accou
 	(
 		get_from_seed::<BabeId>(s),
 		get_from_seed::<GrandpaId>(s),
-		account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
-		account_id_from_seed::<sr25519::Public>(seed)
+		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", s)),
+		get_account_id_from_seed::<sr25519::Public>(s)
 	)
 }
 
@@ -138,6 +138,7 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> GenesisConfig {
+	const STASH: Balance = 100;
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
 			// Add Wasm runtime to storage.
