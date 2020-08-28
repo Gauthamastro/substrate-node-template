@@ -11,3 +11,8 @@
 
 # The cache for chain data in container
 .local
+
+.idea
+
+pallets/template/.idea
+pallets/lib/binary-heap-plus-rs/.idea
