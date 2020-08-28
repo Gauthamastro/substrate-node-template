@@ -11,6 +11,18 @@ version = '2.0.0-rc6'
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
 
+[dependencies.binary-heap-plus]
+path = "../lib/binary-heap-plus-rs"
+#git = "https://github.com/sekineh/binary-heap-plus-rs"
+#tag = "v0.3.0"
+#binary-heap-plus = { git = "https://github.com/sekineh/binary-heap-plus-rs", tag = "v0.3.0" }
+
+[dependencies.sp-std]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc6'
+version = '2.0.0-rc6'
+
 [dependencies.codec]
 default-features = false
 features = ['derive']
@@ -46,6 +58,7 @@ default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
+
 
 [features]
 default = ['std']

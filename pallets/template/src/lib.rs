@@ -6,6 +6,7 @@
 
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
 use frame_system::ensure_signed;
+use binary_heap_plus::{BinaryHeap, MaxComparator};
 
 #[cfg(test)]
 mod mock;
@@ -72,6 +73,11 @@ decl_module! {
 			// https://substrate.dev/docs/en/knowledgebase/runtime/origin
 			let who = ensure_signed(origin)?;
 
+			let mut h = test_heap();
+			h.push(something);
+			h.push(1);
+			h.push(13000);
+			assert_eq!(h.peek().unwrap(),&(13000 as u32), "We are testing the working of heap {},{}",h.peek().unwrap(),&13000);
 			// Update storage.
 			Something::put(something);
 
@@ -100,4 +106,12 @@ decl_module! {
 			}
 		}
 	}
+}
+
+
+pub fn test_heap() -> BinaryHeap<u32, MaxComparator> {
+	use binary_heap_plus::*;
+	use sp_std::vec;
+	let h: BinaryHeap<u32> = BinaryHeap::from_vec(vec![]);
+	h
 }
