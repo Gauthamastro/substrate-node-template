@@ -76,4 +76,5 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'pallet-generic-asset/std',
+    'sp-core/std'
 ]

@@ -4,12 +4,14 @@
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
 
-use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
+use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, };
 use frame_system::ensure_signed;
 use frame_support::codec::{Encode, Decode, };
-use substrate_fixed::types::U16F16;
-use binary_heap_plus::{BinaryHeap, MaxComparator};
+// use binary_heap_plus::{BinaryHeap, MaxComparator};
 use sp_std::str;
+use sp_std::vec::Vec;
+
+mod engine;
 
 #[cfg(test)]
 mod mock;
@@ -55,6 +57,10 @@ decl_storage! {
 		// Learn more about declaring storage items:
 		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
 		Something get(fn something): Option<u32>;
+
+		/// Storage items related to DEX Starts here
+		/// A nonce to use as a subject when drawing randomness
+		Nonce get(fn nonce): u32;
 	}
 }
 
@@ -89,15 +95,16 @@ decl_module! {
 
 		// This function can be used to submit limit orders
 		#[weight = 10000]
-		pub fn submit_limit_order(origin) -> dispatch::DispatchResult{
+		pub fn submit_limit_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given limit order.
+
 		Ok(())
 		}
 
 		// This function can be used to submit market orders
 		#[weight = 10000]
-		pub fn submit_market_order(origin) -> dispatch::DispatchResult{
+		pub fn submit_market_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given market order.
 		Ok(())
@@ -105,7 +112,7 @@ decl_module! {
 
 		// This function can be used to submit advanced orders
 		#[weight = 10000]
-		pub fn submit_advanced_order(origin) -> dispatch::DispatchResult{
+		pub fn submit_advanced_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given advanced order.
 		Ok(())
@@ -113,10 +120,21 @@ decl_module! {
 
 		// This function can be used to cancel orders
 		#[weight = 10000]
-		pub fn cancel_order(origin) -> dispatch::DispatchResult{
+		pub fn cancel_order(origin, user_order_id: engine::OrderId) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the cancel order logic for the given orderID.
 		Ok(())
 		}
 	}
+}
+
+impl<T: Trait> Module<T> {
+    /// Reads the nonce from storage, increments the stored nonce, and returns
+    /// the encoded nonce to the caller.
+    fn encode_and_update_nonce() -> Vec<u8> {
+        let nonce = Nonce::get();
+        Nonce::put(nonce.wrapping_add(1));
+        nonce.encode()
+    }
+
 }
