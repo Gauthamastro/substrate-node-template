@@ -20,7 +20,7 @@ mod tests;
 /// Configure the pallet by specifying the parameters and types on which it depends.
 /// pallet_generic_asset::Trait bounds this DEX pallet with pallet_generic_asset. DEX is available
 /// only for runtimes that also install pallet_generic_asset.
-pub trait Trait: frame_system::Trait + pallet_generic_asset::Trait {
+pub trait Trait: frame_system::Trait + pallet_generic_asset::Trait + balances::Trait {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
