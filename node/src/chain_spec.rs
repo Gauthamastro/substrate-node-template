@@ -2,7 +2,7 @@ use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, BabeConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
 	SudoConfig, SystemConfig, WASM_BINARY, Signature, SessionConfig, StakingConfig, StakerStatus,
-	opaque::SessionKeys, Balance
+	opaque::SessionKeys, Balance, GenericAssetConfig
 };
 // use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_babe::{AuthorityId as BabeId};
@@ -179,6 +179,15 @@ fn testnet_genesis(
 			slash_reward_fraction: Perbill::from_percent(10),
 			.. Default::default()
 		}),
+		pallet_generic_asset: Some(GenericAssetConfig{
+			assets: vec![0],
+			initial_balance: 0,
+			endowed_accounts: endowed_accounts
+				.clone().into_iter().map(Into::into).collect(),
+			next_asset_id: 1,
+			staking_asset_id: 0,
+			spending_asset_id: 0
+		})
 	}
 }
 

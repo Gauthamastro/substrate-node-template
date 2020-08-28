@@ -184,6 +184,12 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
 
+[dependencies.pallet-generic-asset]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc6'
+version = '2.0.0-rc6'
+
 [dependencies.template]
 default-features = false
 package = 'pallet-template'
@@ -205,6 +211,7 @@ std = [
     'pallet-sudo/std',
     'pallet-timestamp/std',
     'pallet-transaction-payment/std',
+    'pallet-generic-asset/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'serde',
     'sp-api/std',
