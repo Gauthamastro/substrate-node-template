@@ -6,7 +6,7 @@
 
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get};
 use frame_system::ensure_signed;
-use frame_support::codec::{Encode, Decode};
+use frame_support::codec::{Encode, Decode, };
 use substrate_fixed::types::U16F16;
 use binary_heap_plus::{BinaryHeap, MaxComparator};
 use sp_std::str;
@@ -20,7 +20,7 @@ mod tests;
 /// Configure the pallet by specifying the parameters and types on which it depends.
 /// pallet_generic_asset::Trait bounds this DEX pallet with pallet_generic_asset. DEX is available
 /// only for runtimes that also install pallet_generic_asset.
-pub trait Trait: frame_system::Trait + pallet_generic_asset::Trait + balances::Trait {
+pub trait Trait: frame_system::Trait + pallet_generic_asset::Trait {
     /// Because this pallet emits events, it depends on the runtime's definition of an event.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 }
@@ -83,6 +83,7 @@ decl_module! {
 		let _trader = ensure_signed(origin)?;
 		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
 		// TODO: pair
+
 		Ok(())
 		}
 
