@@ -236,8 +236,8 @@ use sp_std::vec::Vec;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Encode, Decode)]
 pub struct BinaryHeap<T, C = MaxComparator>
-where
-    C: Compare<T>,
+    where
+        C: Compare<T>,
 {
     data: Vec<T>,
     cmp: C,

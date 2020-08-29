@@ -4,13 +4,14 @@
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// https://substrate.dev/docs/en/knowledgebase/runtime/frame
 
-use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch, };
+use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch};
 use frame_system::ensure_signed;
-use frame_support::codec::{Encode, Decode, };
 // use binary_heap_plus::{BinaryHeap, MaxComparator};
 use sp_std::str;
 use sp_std::vec::Vec;
+use substrate_fixed::types::U32F32;
 
+mod binary_heap;
 mod engine;
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
+
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 /// pallet_generic_asset::Trait bounds this DEX pallet with pallet_generic_asset. DEX is available
@@ -59,8 +61,9 @@ decl_storage! {
 		Something get(fn something): Option<u32>;
 
 		/// Storage items related to DEX Starts here
-		/// A nonce to use as a subject when drawing randomness
-		Nonce get(fn nonce): u32;
+		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId>;
+
+		// OrdersByAccountId get(fn orders_by_accountId):
 	}
 }
 
@@ -81,11 +84,11 @@ decl_module! {
 
 		// This is used to list a new trading pair in the DEX. The origin has to reserve the
 		// TokenListingFee + PairListingFee if the token is not already available in DEX else
-		// only the PairListingFee is reserved until the token is delisted from the DEX.
+		// only the PairListingFee is reserved until the token is de-listed from the DEX.
 		// Origin will not have any interest. It will avoid abusing the DEX with invaluable tokens
 		// and trading pairs.
 		#[weight = 10000]
-		pub fn register_new_orderbook(origin) -> dispatch::DispatchResult{
+		pub fn register_new_orderbook(origin, trading_asset_id: u32, quote_asset_id: u32) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
 		// TODO: pair
@@ -95,7 +98,10 @@ decl_module! {
 
 		// This function can be used to submit limit orders
 		#[weight = 10000]
-		pub fn submit_limit_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
+		pub fn submit_limit_order(origin,
+		  order_type: engine::OrderType,
+		  price: u128,
+		  quantity: u128 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given limit order.
 
@@ -104,7 +110,10 @@ decl_module! {
 
 		// This function can be used to submit market orders
 		#[weight = 10000]
-		pub fn submit_market_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
+		pub fn submit_market_order(origin,
+		  order_type: engine::OrderType,
+		  price: u128,
+		  quantity: u128 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given market order.
 		Ok(())
@@ -112,7 +121,10 @@ decl_module! {
 
 		// This function can be used to submit advanced orders
 		#[weight = 10000]
-		pub fn submit_advanced_order(origin, user_order: engine::Order) -> dispatch::DispatchResult{
+		pub fn submit_advanced_order(origin,
+		  order_type: engine::OrderType,
+		  price: u128,
+		  quantity: u128 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given advanced order.
 		Ok(())
@@ -120,7 +132,7 @@ decl_module! {
 
 		// This function can be used to cancel orders
 		#[weight = 10000]
-		pub fn cancel_order(origin, user_order_id: engine::OrderId) -> dispatch::DispatchResult{
+		pub fn cancel_order(origin, order_id: Vec<u8>) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the cancel order logic for the given orderID.
 		Ok(())
@@ -129,12 +141,9 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    /// Reads the nonce from storage, increments the stored nonce, and returns
-    /// the encoded nonce to the caller.
-    fn encode_and_update_nonce() -> Vec<u8> {
-        let nonce = Nonce::get();
-        Nonce::put(nonce.wrapping_add(1));
-        nonce.encode()
-    }
-
+    // fn encode_and_update_nonce() -> Vec<u8> {
+    //     let nonce = Nonce::get();
+    //     Nonce::put(nonce.wrapping_add(1));
+    //     nonce.encode()
+    // }
 }
