@@ -1,12 +1,10 @@
 use substrate_fixed::types::U32F32;
 use codec::{Encode, Decode};
-use sp_std::vec::Vec;
 use sp_std::cmp::Ordering;
+use sp_std::vec::Vec;
 use sp_std::collections::vec_deque::VecDeque;
 use crate::binary_heap::BinaryHeap;
 
-pub type OrderId = Vec<u8>;
-pub type BlockNumber = u32;
 pub type TradingPair = u32;
 
 #[derive(Encode, Decode, Clone, PartialEq, Debug)]
@@ -36,97 +34,109 @@ impl Default for OrderType {
 
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
-pub struct Order<AccountId> {
-    id: OrderId,
+pub struct Order<AccountId,Hash,BlockNumber> {
+    id: Hash,
     order_type: OrderType,
     price: U32F32,
     quantity: U32F32,
-    origin: AccountId
+    origin: AccountId,
+    expiry: BlockNumber
 }
 
 #[derive(Encode, Decode, Clone, Debug, Default)]
-pub struct PriceLevel<AccountId> {
+pub struct PriceLevel<AccountId,Hash,BlockNumber> {
     price_level: U32F32,
-    queue: VecDeque<Order<AccountId>>,
+    queue: VecDeque<Order<AccountId,Hash,BlockNumber>>,
 }
 
-impl<AccountId> Ord for PriceLevel<AccountId> {
+impl<AccountId,Hash,BlockNumber>  Ord for PriceLevel<AccountId,Hash,BlockNumber> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.price_level.cmp(&other.price_level)
     }
 }
 
-impl<AccountId> PartialOrd for PriceLevel<AccountId> {
+impl<AccountId,Hash,BlockNumber>  PartialOrd for PriceLevel<AccountId,Hash,BlockNumber> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<AccountId> PartialEq for PriceLevel<AccountId> {
+impl<AccountId,Hash,BlockNumber>  PartialEq for PriceLevel<AccountId,Hash,BlockNumber> {
     fn eq(&self, other: &Self) -> bool {
         self.price_level == other.price_level
     }
 }
 
-impl<AccountId> Eq for PriceLevel<AccountId> {}
+impl<AccountId,Hash,BlockNumber>  Eq for PriceLevel<AccountId,Hash,BlockNumber> {}
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
-pub struct OrderBook<AccountId> {
+pub struct OrderBook<AccountId,Hash,BlockNumber,AssetId> {
     id: TradingPair,
     // notation: String BTC/ETH
-    trading_asset: u32, // BTC -- AssetId from GenericAsset
-    quote_asset: u32, // ETH -- AssetId from GenericAsset
+    trading_asset: AssetId, // BTC -- AssetId from GenericAsset
+    quote_asset: AssetId, // ETH -- AssetId from GenericAsset
     nonce: u64,
-    order_ids: VecDeque<OrderId>,
-    orders: VecDeque<Order<AccountId>>,
-    advanced_bid_orders: BinaryHeap<PriceLevel<AccountId>>,
-    advanced_ask_orders: BinaryHeap<PriceLevel<AccountId>>,
-    expiring_orders: BinaryHeap<BlockNumber>,
-    bids: BinaryHeap<PriceLevel<AccountId>>,
-    asks: BinaryHeap<PriceLevel<AccountId>>,
+    order_ids: VecDeque<Hash>,
+    orders: VecDeque<Order<AccountId,Hash,BlockNumber>>,
+    advanced_bid_orders: BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>>,
+    advanced_ask_orders: BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>>,
+    bids: BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>>,
+    asks: BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>>,
+    market_data: Vec<MarketData<BlockNumber>>
+}
+
+#[derive(Encode, Decode, Clone, Debug, Default)]
+pub struct MarketData<BlockNumber>{
+    current_block: BlockNumber,
+    opening_bid: U32F32,
+    opening_ask: U32F32,
+    closing_bid: U32F32,
+    closing_ask: U32F32,
+    volume: U32F32
 }
 
 
-impl<AccountId> Ord for BinaryHeap<PriceLevel<AccountId>> {
+// FIXME(The given implementation is not correct and needs to be fixed later)
+impl<BlockNumber>  Ord for MarketData<BlockNumber> {
     fn cmp(&self, _other: &Self) -> Ordering {
         Ordering::Equal
     }
 }
 
-impl<AccountId> PartialOrd for BinaryHeap<PriceLevel<AccountId>> {
-    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
-        Some(Ordering::Equal)
+impl<BlockNumber>  PartialOrd for MarketData<BlockNumber> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
-impl<AccountId> PartialEq for BinaryHeap<PriceLevel<AccountId>> {
+impl<BlockNumber>  PartialEq for MarketData<BlockNumber> {
     fn eq(&self, _other: &Self) -> bool {
         false
     }
 }
 
-impl<AccountId> Eq for BinaryHeap<PriceLevel<AccountId>> {}
+impl<BlockNumber>  Eq for MarketData<BlockNumber> {}
 
-impl Ord for BinaryHeap<BlockNumber> {
+
+impl<AccountId,Hash,BlockNumber> Ord for BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>> {
     fn cmp(&self, _other: &Self) -> Ordering {
         Ordering::Equal
     }
 }
 
-impl PartialOrd for BinaryHeap<BlockNumber> {
+impl<AccountId,Hash,BlockNumber> PartialOrd for BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>> {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
     }
 }
 
-impl PartialEq for BinaryHeap<BlockNumber> {
+impl<AccountId,Hash,BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>> {
     fn eq(&self, _other: &Self) -> bool {
         false
     }
 }
 
-impl Eq for BinaryHeap<BlockNumber> {}
-
+impl<AccountId,Hash,BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId,Hash,BlockNumber>> {}
 
 
 

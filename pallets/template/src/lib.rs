@@ -6,10 +6,8 @@
 
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch};
 use frame_system::ensure_signed;
-// use binary_heap_plus::{BinaryHeap, MaxComparator};
 use sp_std::str;
-use sp_std::vec::Vec;
-use substrate_fixed::types::U32F32;
+use substrate_fixed::types::{U32F32};
 
 mod binary_heap;
 mod engine;
@@ -19,7 +17,6 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
-
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 /// pallet_generic_asset::Trait bounds this DEX pallet with pallet_generic_asset. DEX is available
@@ -35,7 +32,7 @@ decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
-		SomethingStored(u32, AccountId),
+		TradeAmount(U32F32, AccountId),
 	}
 );
 
@@ -46,6 +43,8 @@ decl_error! {
 		NoneValue,
 		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
+		/// Error occured due to a Overflow during calculation
+		CalculationOverflow
 	}
 }
 
@@ -61,7 +60,7 @@ decl_storage! {
 		Something get(fn something): Option<u32>;
 
 		/// Storage items related to DEX Starts here
-		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId>;
+		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId,T::Hash,T::BlockNumber,T::AssetId>;
 
 		// OrdersByAccountId get(fn orders_by_accountId):
 	}
@@ -100,11 +99,16 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_limit_order(origin,
 		  order_type: engine::OrderType,
-		  price: u128,
-		  quantity: u128 ) -> dispatch::DispatchResult{
-		let _trader = ensure_signed(origin)?;
+		  order_id: T::Hash,
+		  price: U32F32,
+		  quantity: U32F32) -> dispatch::DispatchResult{
+		let trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given limit order.
 
+		// Refer the fixed point to floating point converter for more information. The given function works!!
+		let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
+		// Emit Event
+		Self::deposit_event(RawEvent::TradeAmount(trade_amount, trader));
 		Ok(())
 		}
 
@@ -112,8 +116,9 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_market_order(origin,
 		  order_type: engine::OrderType,
-		  price: u128,
-		  quantity: u128 ) -> dispatch::DispatchResult{
+		  order_id: T::Hash,
+		  price: U32F32,
+		  quantity: U32F32 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given market order.
 		Ok(())
@@ -123,8 +128,9 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_advanced_order(origin,
 		  order_type: engine::OrderType,
-		  price: u128,
-		  quantity: u128 ) -> dispatch::DispatchResult{
+		  order_id: T::Hash,
+		  price: U32F32,
+		  quantity: U32F32 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given advanced order.
 		Ok(())
@@ -132,7 +138,7 @@ decl_module! {
 
 		// This function can be used to cancel orders
 		#[weight = 10000]
-		pub fn cancel_order(origin, order_id: Vec<u8>) -> dispatch::DispatchResult{
+		pub fn cancel_order(origin, order_id: T::Hash) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the cancel order logic for the given orderID.
 		Ok(())
@@ -146,4 +152,7 @@ impl<T: Trait> Module<T> {
     //     Nonce::put(nonce.wrapping_add(1));
     //     nonce.encode()
     // }
+    fn calculate_trade_amount(price: U32F32, quantity: U32F32) -> Option<U32F32> {
+        price.checked_mul(quantity)
+    }
 }
