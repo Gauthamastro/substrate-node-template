@@ -33,6 +33,10 @@ decl_event!(
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		TradeAmount(U32F32, AccountId),
+
+		/// Contains market state about current block.
+		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
+		MarketData(u32,u32,U32F32,U32F32,U32F32,U32F32,U32F32),
 	}
 );
 
