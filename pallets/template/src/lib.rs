@@ -48,16 +48,12 @@ decl_error! {
 	}
 }
 
-// The pallet's runtime storage items.
-// https://substrate.dev/docs/en/knowledgebase/runtime/storage
 decl_storage! {
 	// A unique name is used to ensure that the pallet's storage items are isolated.
 	// This name may be updated, but each pallet in the runtime must use a unique name.
 	// ---------------------------------vvvvvvvvvvvvvv
 	trait Store for Module<T: Trait> as TemplateModule {
-		// Learn more about declaring storage items:
-		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-		Something get(fn something): Option<u32>;
+
 
 		/// Storage items related to DEX Starts here
 		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId,T::Hash,T::BlockNumber,T::AssetId>;
@@ -152,6 +148,8 @@ impl<T: Trait> Module<T> {
     //     Nonce::put(nonce.wrapping_add(1));
     //     nonce.encode()
     // }
+
+    /// Call this function to calculate trade amount based on given price and quantity
     fn calculate_trade_amount(price: U32F32, quantity: U32F32) -> Option<U32F32> {
         price.checked_mul(quantity)
     }
