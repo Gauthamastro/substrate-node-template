@@ -8,6 +8,8 @@ use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch}
 use frame_system::ensure_signed;
 use sp_std::str;
 use substrate_fixed::types::{U32F32};
+use sp_std::convert::TryInto;
+use sp_std::vec::Vec;
 
 mod binary_heap;
 mod engine;
@@ -33,10 +35,23 @@ decl_event!(
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		TradeAmount(U32F32, AccountId),
-
+		/// Not enough asset free balance for placing the trade
+		InsufficientAssetBalance(U32F32),
+		/// Order contains a duplicate orderId of another active order
+		DuplicateOrderId(Vec<u8>),
+		/// Order type of Order is None
+		OrderTypeIsNone,
+		/// Invalid TradingPair Id
+		TradingPairNotFound(u32),
+		/// Same Assets cannot be traded
+		SameAssetIdsError(u32,u32),
+		/// Zero Balances in either one or both Assets
+		NoBalanceOfAssets(u128,u128),
 		/// Contains market state about current block.
 		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
 		MarketData(u32,u32,U32F32,U32F32,U32F32,U32F32,U32F32),
+		// FIXME( Currently we iterate over all the trading pairs and emit events which is expensive)
+		// TODO: Emit Market Data for only those markets which changed during the block.
 	}
 );
 
@@ -48,7 +63,13 @@ decl_error! {
 		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
 		/// Error occured due to a Overflow during calculation
-		CalculationOverflow
+		CalculationOverflow,
+		/// Order Failed to pass basic order checks
+		BasicOrderChecksFailed,
+		/// Same assets cannot be traded
+		SameAssetIdsError,
+		/// Zero Balance in both assets during registration
+		InsufficientAssetBalance
 	}
 }
 
@@ -57,12 +78,8 @@ decl_storage! {
 	// This name may be updated, but each pallet in the runtime must use a unique name.
 	// ---------------------------------vvvvvvvvvvvvvv
 	trait Store for Module<T: Trait> as TemplateModule {
-
-
 		/// Storage items related to DEX Starts here
-		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId,T::Hash,T::BlockNumber,T::AssetId>;
-
-		// OrdersByAccountId get(fn orders_by_accountId):
+		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId,T::BlockNumber,T::AssetId>;
 	}
 }
 
@@ -91,6 +108,19 @@ decl_module! {
 		let _trader = ensure_signed(origin)?;
 		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
 		// TODO: pair
+		if &trading_asset_id == &quote_asset_id {
+		Self::deposit_event(RawEvent::SameAssetIdsError(trading_asset_id, quote_asset_id));
+		return Err(<Error<T>>::SameAssetIdsError.into());
+		}
+		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_AssetId(trading_asset_id), &_trader);
+		let quote_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_AssetId(quote_asset_id), &_trader);
+		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) && (TryInto::<u128>::try_into(quote_asset_balance).ok().unwrap()>0){
+
+		}else{
+		Self::deposit_event(RawEvent::NoBalanceOfAssets(TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap(),
+		TryInto::<u128>::try_into(quote_asset_balance).ok().unwrap()));
+		return Err(<Error<T>>::InsufficientAssetBalance.into());
+		}
 
 		Ok(())
 		}
@@ -99,16 +129,28 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_limit_order(origin,
 		  order_type: engine::OrderType,
-		  order_id: T::Hash,
+		  order_id: sp_std::vec::Vec<u8>,
 		  price: U32F32,
-		  quantity: U32F32) -> dispatch::DispatchResult{
+		  quantity: U32F32,
+		  trading_pair: u32) -> dispatch::DispatchResult{
 		let trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given limit order.
+		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type,order_id){
 
+		Some(_order_book) => {
+		// TODO: Reserve the balance
+		// TODO: Update the market data struct
+		// TODO: Try to execute order else put it in the order book
+		// TODO: Update the market data struct
 		// Refer the fixed point to floating point converter for more information. The given function works!!
 		let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
 		// Emit Event
 		Self::deposit_event(RawEvent::TradeAmount(trade_amount, trader));
+		         },
+		None => {
+		return Err(<Error<T>>::BasicOrderChecksFailed.into());
+		        }
+		    }
 		Ok(())
 		}
 
@@ -152,9 +194,47 @@ impl<T: Trait> Module<T> {
     //     Nonce::put(nonce.wrapping_add(1));
     //     nonce.encode()
     // }
+    fn u32_to_AssetId(input: u32) -> T::AssetId{
+        input.into()
+    }
 
     /// Call this function to calculate trade amount based on given price and quantity
     fn calculate_trade_amount(price: U32F32, quantity: U32F32) -> Option<U32F32> {
         price.checked_mul(quantity)
+    }
+
+    /// Check trading pair
+    /// Check balance
+    /// Check order id
+    /// Check order_type for Valid order type
+    /// TODO: Check if price & quantity is Zero
+    /// TODO: Get reference to orderbook from the calling function to avoid accessing storage again
+    fn basic_order_checks(origin: &<T as frame_system::Trait>::AccountId, trading_pair: u32,
+                          price: U32F32, quantity: U32F32, order_type: engine::OrderType,
+                          order_id: sp_std::vec::Vec<u8>) -> Option<engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>> {
+        if !(<Books<T>>::contains_key(trading_pair)) {
+            Self::deposit_event(RawEvent::TradingPairNotFound(trading_pair));
+            return None;
+        } else if order_type == engine::OrderType::None {
+            Self::deposit_event(RawEvent::OrderTypeIsNone);
+            return None;
+        }
+        let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
+
+        let trading_asset_id = order_book.get_trading_asset();
+        // let quote_asset_id = orderBook.get_quote_asset();
+        let temp = pallet_generic_asset::Module::<T>::free_balance(&trading_asset_id, &origin);
+        let temp_converted = TryInto::<u128>::try_into(temp).ok().unwrap();
+        return if U32F32::from_num(temp_converted) >= (&price).checked_mul(quantity).unwrap() {
+            if order_book.get_orders().contains_key(&order_id) {
+                Self::deposit_event(RawEvent::DuplicateOrderId(order_id));
+                None
+            } else {
+                Some(order_book)
+            }
+        } else {
+            Self::deposit_event(RawEvent::InsufficientAssetBalance((&price).checked_mul(quantity).unwrap()));
+            None
+        };
     }
 }
