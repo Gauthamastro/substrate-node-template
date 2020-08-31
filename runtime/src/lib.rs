@@ -285,7 +285,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = SpendingAssetCurrency<Self>;
 	type OnTransactionPayment = ();
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
@@ -300,14 +300,20 @@ impl pallet_sudo::Trait for Runtime {
 /// Struct that handles the conversion of Balance -> `u64`. This is used for staking's election
 /// calculation.
 use sp_runtime::traits::Convert;
+use pallet_generic_asset::{SpendingAssetCurrency, StakingAssetCurrency};
+use frame_support::traits::Currency;
+
 pub struct CurrencyToVoteHandler;
 
 impl CurrencyToVoteHandler {
-	fn factor() -> Balance { (Balances::total_issuance() / u64::max_value() as Balance).max(1) }
+	fn factor() -> Balance {
+		let total_issuance: Balance = <pallet_generic_asset::StakingAssetCurrency<Runtime>>::total_issuance();
+		(total_issuance / u64::max_value() as Balance).max(1) }
 }
 
 impl Convert<Balance, u64> for CurrencyToVoteHandler {
-	fn convert(x: Balance) -> u64 { (x / Self::factor()) as u64 }
+	fn convert(x: Balance) -> u64 {
+		(x / Self::factor()) as u64 }
 }
 
 impl Convert<u128, Balance> for CurrencyToVoteHandler {
@@ -359,7 +365,7 @@ parameter_types! {
 }
 
 impl pallet_staking::Trait for Runtime {
-	type Currency = Balances;
+	type Currency = StakingAssetCurrency<Self>;
 	type UnixTime = Timestamp;
 	type CurrencyToVote = CurrencyToVoteHandler;
 	type RewardRemainder = (); // Treasury
