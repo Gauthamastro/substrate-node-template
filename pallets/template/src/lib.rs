@@ -10,6 +10,7 @@ use sp_std::str;
 use substrate_fixed::types::{U32F32};
 use sp_std::convert::TryInto;
 use sp_std::vec::Vec;
+use pallet_generic_asset::AssetIdProvider;
 
 mod binary_heap;
 mod engine;
@@ -47,6 +48,8 @@ decl_event!(
 		SameAssetIdsError(u32,u32),
 		/// Zero Balances in either one or both Assets
 		NoBalanceOfAssets(u128,u128),
+		/// When a new TradingPair is created
+		TradingPairCreated(u32),
 		/// Contains market state about current block.
 		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
 		MarketData(u32,u32,U32F32,U32F32,U32F32,U32F32,U32F32),
@@ -80,6 +83,8 @@ decl_storage! {
 	trait Store for Module<T: Trait> as TemplateModule {
 		/// Storage items related to DEX Starts here
 		Books get(fn books): map hasher(blake2_128_concat) u32 => engine::OrderBook<T::AccountId,T::BlockNumber,T::AssetId>;
+
+		BookId get(fn book_id): u32;
 	}
 }
 
@@ -115,14 +120,18 @@ decl_module! {
 		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(trading_asset_id), &_trader);
 		let quote_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(quote_asset_id), &_trader);
 		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) && (TryInto::<u128>::try_into(quote_asset_balance).ok().unwrap()>0){
-
+		if Self::reserve_balance_registration(&_trader){
+		let trading_pair_id = Self::create_order_book(Self::u32_to_asset_id(trading_asset_id),Self::u32_to_asset_id(quote_asset_id));
+		Self::deposit_event(RawEvent::TradingPairCreated(trading_pair_id));
+		return Ok(());
+		}else{
+		return Err(<Error<T>>::InsufficientAssetBalance.into());
+		}
 		}else{
 		Self::deposit_event(RawEvent::NoBalanceOfAssets(TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap(),
 		TryInto::<u128>::try_into(quote_asset_balance).ok().unwrap()));
 		return Err(<Error<T>>::InsufficientAssetBalance.into());
 		}
-
-		Ok(())
 		}
 
 		// This function can be used to submit limit orders
@@ -188,13 +197,51 @@ decl_module! {
 	}
 }
 
+use sp_std::collections::btree_map;
+use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
+
 impl<T: Trait> Module<T> {
     // fn encode_and_update_nonce() -> Vec<u8> {
     //     let nonce = Nonce::get();
     //     Nonce::put(nonce.wrapping_add(1));
     //     nonce.encode()
     // }
-    fn u32_to_asset_id(input: u32) -> T::AssetId{
+
+    fn create_order_book(trading_asset_id: T::AssetId, quote_asset_id: T::AssetId) -> u32 {
+        let current_id = Self::book_id();
+        let current_block_num = <frame_system::Module<T>>::current_block_number();
+        let order_book: engine::OrderBook<T::AccountId,T::BlockNumber,T::AssetId> = engine::OrderBook{
+            id: current_id,
+            trading_asset: trading_asset_id,
+            quote_asset: quote_asset_id,
+            nonce: 0,
+            orders:  btree_map::BTreeMap::new() ,
+            advanced_bid_orders: binary_heap::BinaryHeap::new(),
+            advanced_ask_orders: binary_heap::BinaryHeap::new_min(),
+            bids: binary_heap::BinaryHeap::new(),
+            asks: binary_heap::BinaryHeap::new_min(),
+            market_data: sp_std::vec![engine::MarketData{
+                current_block:  current_block_num,
+                opening_bid: U32F32::from_num(0),
+                opening_ask: U32F32::from_num(0),
+                closing_bid: U32F32::from_num(0),
+                closing_ask: U32F32::from_num(0),
+                volume: U32F32::from_num(0)
+            }],
+            enabled: true
+        };
+        let tradingpair = order_book.id.clone();
+        BookId::put(current_id+1);
+        Books::<T>::insert(order_book.id as u32,order_book);
+        return tradingpair
+    }
+
+    fn reserve_balance_registration(origin: &<T as frame_system::Trait>::AccountId) -> bool {
+        pallet_generic_asset::Module::<T>::reserve(
+            &pallet_generic_asset::SpendingAssetIdProvider::<T>::asset_id(),
+            origin, 10000.into()).is_ok()   // TODO: Fix a new amount using Configuration Trait
+    }
+    fn u32_to_asset_id(input: u32) -> T::AssetId {
         input.into()
     }
 

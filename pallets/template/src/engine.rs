@@ -3,7 +3,7 @@ use codec::{Encode, Decode};
 use sp_std::cmp::Ordering;
 use sp_std::vec::Vec;
 use sp_std::collections::vec_deque::VecDeque;
-use crate::binary_heap::BinaryHeap;
+use crate::binary_heap::{BinaryHeap, MinComparator};
 use sp_std::collections::btree_map;
 
 pub type TradingPair = u32;
@@ -72,20 +72,20 @@ impl<AccountId, BlockNumber> Eq for PriceLevel<AccountId, BlockNumber> {}
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
 pub struct OrderBook<AccountId, BlockNumber, AssetId> {
-    id: TradingPair,
+    pub(crate) id: TradingPair,
     // notation: String BTC/ETH
-    trading_asset: AssetId,
+    pub(crate) trading_asset: AssetId,
     // BTC -- AssetId from GenericAsset
-    quote_asset: AssetId,
+    pub(crate) quote_asset: AssetId,
     // ETH -- AssetId from GenericAsset
-    nonce: u64,
-    orders: btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>>,
-    advanced_bid_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    advanced_ask_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    bids: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    asks: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    market_data: Vec<MarketData<BlockNumber>>,
-    enabled: bool,
+    pub(crate) nonce: u64,
+    pub(crate) orders: btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>>,
+    pub(crate) advanced_bid_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
+    pub(crate) advanced_ask_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator>,
+    pub(crate) bids: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
+    pub(crate) asks: BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator>,
+    pub(crate) market_data: Vec<MarketData<BlockNumber>>,
+    pub(crate) enabled: bool,
 }
 
 impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId> {
@@ -104,12 +104,12 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
 
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct MarketData<BlockNumber> {
-    current_block: BlockNumber,
-    opening_bid: U32F32,
-    opening_ask: U32F32,
-    closing_bid: U32F32,
-    closing_ask: U32F32,
-    volume: U32F32,
+    pub(crate) current_block: BlockNumber,
+    pub(crate) opening_bid: U32F32,
+    pub(crate) opening_ask: U32F32,
+    pub(crate) closing_bid: U32F32,
+    pub(crate) closing_ask: U32F32,
+    pub(crate) volume: U32F32,
 }
 
 
@@ -154,6 +154,29 @@ impl<AccountId, BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId, Bloc
 }
 
 impl<AccountId, BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId, BlockNumber>> {}
+
+
+
+// For MinComparator Binary-Heap
+impl<AccountId, BlockNumber> Ord for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+    fn cmp(&self, _other: &Self) -> Ordering {
+        Ordering::Equal
+    }
+}
+
+impl<AccountId, BlockNumber> PartialOrd for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
+        Some(Ordering::Equal)
+    }
+}
+
+impl<AccountId, BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+impl<AccountId, BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {}
 
 
 

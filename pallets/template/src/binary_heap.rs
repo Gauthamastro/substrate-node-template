@@ -373,6 +373,11 @@ impl<T: Ord> Default for BinaryHeap<T> {
     }
 }
 
+impl<T: Ord> Default for BinaryHeap<T,MinComparator>{
+    #[inline]
+    fn default() -> BinaryHeap<T,MinComparator>{BinaryHeap::new_min()}
+}
+
 // #[stable(feature = "binaryheap_debug", since = "1.4.0")]
 impl<T: fmt::Debug, C: Compare<T>> fmt::Debug for BinaryHeap<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
