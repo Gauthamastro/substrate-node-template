@@ -76,7 +76,7 @@ pub struct OrderBook<AccountId, BlockNumber, AssetId> {
     // notation: String BTC/ETH
     pub(crate) trading_asset: AssetId,
     // BTC -- AssetId from GenericAsset
-    pub(crate) quote_asset: AssetId,
+    pub(crate) base_asset: AssetId,
     // ETH -- AssetId from GenericAsset
     pub(crate) nonce: u64,
     pub(crate) orders: btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>>,
@@ -93,8 +93,8 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
         return &self.trading_asset;
     }
 
-    pub fn get_quote_asset(&self) -> &AssetId {
-        return &self.quote_asset;
+    pub fn get_base_asset(&self) -> &AssetId {
+        return &self.base_asset;
     }
 
     pub fn get_orders(&self) -> &btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>> {
