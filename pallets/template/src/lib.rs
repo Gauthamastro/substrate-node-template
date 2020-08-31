@@ -112,8 +112,8 @@ decl_module! {
 		Self::deposit_event(RawEvent::SameAssetIdsError(trading_asset_id, quote_asset_id));
 		return Err(<Error<T>>::SameAssetIdsError.into());
 		}
-		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_AssetId(trading_asset_id), &_trader);
-		let quote_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_AssetId(quote_asset_id), &_trader);
+		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(trading_asset_id), &_trader);
+		let quote_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(quote_asset_id), &_trader);
 		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) && (TryInto::<u128>::try_into(quote_asset_balance).ok().unwrap()>0){
 
 		}else{
@@ -194,7 +194,7 @@ impl<T: Trait> Module<T> {
     //     Nonce::put(nonce.wrapping_add(1));
     //     nonce.encode()
     // }
-    fn u32_to_AssetId(input: u32) -> T::AssetId{
+    fn u32_to_asset_id(input: u32) -> T::AssetId{
         input.into()
     }
 

@@ -265,20 +265,20 @@ impl pallet_timestamp::Trait for Runtime {
 	type WeightInfo = ();
 }
 
-// parameter_types! {
-// 	pub const ExistentialDeposit: u128 = 500;
-// }
-//
-// impl pallet_balances::Trait for Runtime {
-// 	/// The type for recording an account's balance.
-// 	type Balance = Balance;
-// 	/// The ubiquitous event type.
-// 	type Event = Event;
-// 	type DustRemoval = ();
-// 	type ExistentialDeposit = ExistentialDeposit;
-// 	type AccountStore = System;
-// 	type WeightInfo = ();
-// }
+parameter_types! {
+	pub const ExistentialDeposit: u128 = 500;
+}
+
+impl pallet_balances::Trait for Runtime {
+	/// The type for recording an account's balance.
+	type Balance = Balance;
+	/// The ubiquitous event type.
+	type Event = Event;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type WeightInfo = ();
+}
 
 parameter_types! {
 	pub const TransactionByteFee: Balance = 1;
@@ -429,15 +429,15 @@ construct_runtime!(
 		System: frame_system::{Module, Call, Config, Storage, Event<T>},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
 		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+		GenericAsset: pallet_generic_asset::{Module, Call, Storage, Config<T>, Event<T>},
 		Babe: pallet_babe::{Module, Call, Storage, Config, Inherent, ValidateUnsigned},
 		Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
-		// Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
+		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Historical: pallet_session_historical::{Module},
-		GenericAsset: pallet_generic_asset::{Module, Call, Storage, Config<T>, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
 		TemplateModule: template::{Module, Call, Storage, Event<T>},
 	}
