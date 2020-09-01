@@ -7,7 +7,7 @@
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch};
 use frame_system::ensure_signed;
 use sp_std::str;
-use substrate_fixed::types::{U32F32};
+use sp_arithmetic::FixedU128;
 use sp_std::convert::TryInto;
 use sp_std::vec::Vec;
 use pallet_generic_asset::AssetIdProvider;
@@ -35,9 +35,9 @@ decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
-		TradeAmount(U32F32, AccountId),
+		TradeAmount(FixedU128, AccountId),
 		/// Not enough asset free balance for placing the trade
-		InsufficientAssetBalance(u128),
+		InsufficientAssetBalance(FixedU128),
 		/// Order contains a duplicate orderId of another active order
 		DuplicateOrderId(Vec<u8>),
 		/// Order type of Order is None
@@ -54,7 +54,7 @@ decl_event!(
 		TradingPairCreated(u32),
 		/// Contains market state about current block.
 		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
-		MarketData(u32,u32,U32F32,U32F32,U32F32,U32F32,U32F32),
+		MarketData(u32,u32,FixedU128,FixedU128,FixedU128,FixedU128,FixedU128),
 		// FIXME( Currently we iterate over all the trading pairs and emit events which is expensive)
 		// TODO: Emit Market Data for only those markets which changed during the block.
 	}
@@ -128,6 +128,7 @@ decl_module! {
 		let base_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(base_asset_id), &_trader);
 		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) && (TryInto::<u128>::try_into(base_asset_balance).ok().unwrap()>0){
 		// The origin should reserve a certain amount of SpendingAssetCurrency for registering the pair
+
 		if Self::reserve_balance_registration(&_trader){
 		// Create the orderbook
 		let trading_pair_id = Self::create_order_book(Self::u32_to_asset_id(trading_asset_id),Self::u32_to_asset_id(base_asset_id));
@@ -151,8 +152,8 @@ decl_module! {
 		pub fn submit_limit_order(origin,
 		  order_type: engine::OrderType,
 		  order_id: sp_std::vec::Vec<u8>,
-		  price: U32F32,
-		  quantity: U32F32,
+		  price: FixedU128,
+		  quantity: FixedU128,
 		  trading_pair: u32) -> dispatch::DispatchResult{
 		let trader = ensure_signed(origin)?;
 
@@ -165,6 +166,7 @@ decl_module! {
 		// TODO: Update the market data struct
 		// Refer the fixed point to floating point converter for more information. The given function works!!
 		let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
+
 		// Emit Event
 		Self::deposit_event(RawEvent::TradeAmount(trade_amount, trader));
 		         },
@@ -180,8 +182,8 @@ decl_module! {
 		pub fn submit_market_order(origin,
 		  order_type: engine::OrderType,
 		  order_id: sp_std::vec::Vec<u8>,
-		  price: U32F32,
-		  quantity: U32F32 ) -> dispatch::DispatchResult{
+		  price: FixedU128,
+		  quantity: FixedU128 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given market order.
 		Ok(())
@@ -192,8 +194,8 @@ decl_module! {
 		pub fn submit_advanced_order(origin,
 		  order_type: engine::OrderType,
 		  order_id: sp_std::vec::Vec<u8>,
-		  price: U32F32,
-		  quantity: U32F32 ) -> dispatch::DispatchResult{
+		  price: FixedU128,
+		  quantity: FixedU128 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the order logic for the given advanced order.
 		Ok(())
@@ -212,6 +214,7 @@ decl_module! {
 use sp_std::collections::btree_map;
 use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
 use frame_support::traits::IsType;
+use sp_arithmetic::traits::CheckedMul;
 
 impl<T: Trait> Module<T> {
     // fn encode_and_update_nonce() -> Vec<u8> {
@@ -235,11 +238,11 @@ impl<T: Trait> Module<T> {
             asks: binary_heap::BinaryHeap::new_min(),
             market_data: sp_std::vec![engine::MarketData{
                 current_block:  current_block_num,
-                opening_bid: U32F32::from_num(0),
-                opening_ask: U32F32::from_num(0),
-                closing_bid: U32F32::from_num(0),
-                closing_ask: U32F32::from_num(0),
-                volume: U32F32::from_num(0)
+                opening_bid: FixedU128::from(0),
+                opening_ask: FixedU128::from(0),
+                closing_bid: FixedU128::from(0),
+                closing_ask: FixedU128::from(0),
+                volume: FixedU128::from(0)
             }],
             enabled: true,
         };
@@ -250,7 +253,6 @@ impl<T: Trait> Module<T> {
     }
 
     fn reserve_balance_registration(origin: &<T as frame_system::Trait>::AccountId) -> bool {
-
         pallet_generic_asset::Module::<T>::reserve(
             &pallet_generic_asset::SpendingAssetIdProvider::<T>::asset_id(),
             origin, 1000000.into()).is_ok()   // TODO: Fix a new amount using Configuration Trait
@@ -260,8 +262,8 @@ impl<T: Trait> Module<T> {
     }
 
     /// Call this function to calculate trade amount based on given price and quantity
-    fn calculate_trade_amount(price: U32F32, quantity: U32F32) -> Option<U32F32> {
-        price.checked_mul(quantity)
+    fn calculate_trade_amount(price: FixedU128, quantity: FixedU128) -> Option<FixedU128> {
+        price.checked_mul(&quantity)
     }
 
     /// Checks trading pair
@@ -274,9 +276,9 @@ impl<T: Trait> Module<T> {
     /// Trading pair notation: trading_asset/base_asset ie (BTC/USDT)
     /// Price is BTC/USDT and Quantity is BTC
     fn basic_order_checks(origin: &<T as frame_system::Trait>::AccountId, trading_pair: u32,
-                          price: U32F32, quantity: U32F32, order_type: engine::OrderType,
+                          price: FixedU128, quantity: FixedU128, order_type: engine::OrderType,
                           order_id: sp_std::vec::Vec<u8>) -> Option<engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>> {
-        if price <= 0 && quantity <= 0 {
+        if price <= FixedU128::from(0) && quantity <= FixedU128::from(0) {
             Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
             return None;
         }
@@ -302,7 +304,7 @@ impl<T: Trait> Module<T> {
                 let trading_balance = pallet_generic_asset::Module::<T>::free_balance(&trading_asset_id, &origin);
                 // TODO: unwrap() has a chance to panic. Remove it!
                 if let Some(trading_balance_converted ) = TryInto::<u128>::try_into(trading_balance).ok(){
-                    if Self::has_balance_for_trading(orders.into_ref(), trading_balance_converted, quantity, order_id) {
+                    if Self::has_balance_for_trading(orders.into_ref(), FixedU128::from(trading_balance_converted), quantity, order_id) {
                         Some(order_book)
                     } else {
                         None
@@ -316,8 +318,8 @@ impl<T: Trait> Module<T> {
                 let base_balance = pallet_generic_asset::Module::<T>::free_balance(&base_asset_id, &origin);
                 // TODO: unwrap() has a chance to panic. Remove it!
                 if let Some(base_balance_converted) = TryInto::<u128>::try_into(base_balance).ok(){
-                    let computed_trade_amount = (&price).checked_mul(quantity).unwrap();
-                    if Self::has_balance_for_trading(orders.into_ref(), base_balance_converted, computed_trade_amount, order_id) {
+                    let computed_trade_amount = (&price).checked_mul(&quantity).unwrap();
+                    if Self::has_balance_for_trading(orders.into_ref(), FixedU128::from(base_balance_converted), computed_trade_amount, order_id) {
                         Some(order_book)
                     } else {
                         None
@@ -345,11 +347,11 @@ impl<T: Trait> Module<T> {
 
     /// Checks if the balance is enough to execute given trade and returns the orderbook
     fn has_balance_for_trading(orders: &btree_map::BTreeMap<Vec<u8>, engine::Order<T::AccountId, T::BlockNumber>>,
-                               balance_to_check: u128,
-                               computed_amount: U32F32,
+                               balance_to_check: FixedU128,
+                               computed_amount: FixedU128,
                                order_id: sp_std::vec::Vec<u8>)
                                -> bool {
-        return if U32F32::from_num(balance_to_check) >= computed_amount {
+        return if balance_to_check >= computed_amount {
             if Self::check_order_id(&orders, order_id) {
                 true
             } else {

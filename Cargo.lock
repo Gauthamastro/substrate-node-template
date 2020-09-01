@@ -3684,6 +3684,7 @@ dependencies = [
  "pallet-generic-asset",
  "parity-scale-codec",
  "serde",
+ "sp-arithmetic",
  "sp-core",
  "sp-io",
  "sp-runtime",

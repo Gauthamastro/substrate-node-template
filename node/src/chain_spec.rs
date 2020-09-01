@@ -139,7 +139,7 @@ fn testnet_genesis(
 	_enable_println: bool,
 ) -> GenesisConfig {
 	const STASH: Balance = 100;
-	const UNIT: u128 = 1000000000000;
+	const UNIT: u128 = 1_000_000_000_000_000_000;
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
 			// Add Wasm runtime to storage.
