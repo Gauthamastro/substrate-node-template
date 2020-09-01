@@ -117,6 +117,7 @@ decl_module! {
 		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
 		// TODO: pair
 
+
 		// If assets ids are same then it's error
 		if &trading_asset_id == &base_asset_id {
 		Self::deposit_event(RawEvent::SameAssetIdsError(trading_asset_id, base_asset_id));
@@ -178,7 +179,7 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_market_order(origin,
 		  order_type: engine::OrderType,
-		  order_id: T::Hash,
+		  order_id: sp_std::vec::Vec<u8>,
 		  price: U32F32,
 		  quantity: U32F32 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
@@ -190,7 +191,7 @@ decl_module! {
 		#[weight = 10000]
 		pub fn submit_advanced_order(origin,
 		  order_type: engine::OrderType,
-		  order_id: T::Hash,
+		  order_id: sp_std::vec::Vec<u8>,
 		  price: U32F32,
 		  quantity: U32F32 ) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
@@ -200,7 +201,7 @@ decl_module! {
 
 		// This function can be used to cancel orders
 		#[weight = 10000]
-		pub fn cancel_order(origin, order_id: T::Hash) -> dispatch::DispatchResult{
+		pub fn cancel_order(origin, order_id: sp_std::vec::Vec<u8>) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Do the cancel order logic for the given orderID.
 		Ok(())
@@ -249,9 +250,10 @@ impl<T: Trait> Module<T> {
     }
 
     fn reserve_balance_registration(origin: &<T as frame_system::Trait>::AccountId) -> bool {
+
         pallet_generic_asset::Module::<T>::reserve(
             &pallet_generic_asset::SpendingAssetIdProvider::<T>::asset_id(),
-            origin, 10000.into()).is_ok()   // TODO: Fix a new amount using Configuration Trait
+            origin, 1000000.into()).is_ok()   // TODO: Fix a new amount using Configuration Trait
     }
     fn u32_to_asset_id(input: u32) -> T::AssetId {
         input.into()
@@ -299,10 +301,13 @@ impl<T: Trait> Module<T> {
                 // Check if that much quantity is available
                 let trading_balance = pallet_generic_asset::Module::<T>::free_balance(&trading_asset_id, &origin);
                 // TODO: unwrap() has a chance to panic. Remove it!
-                let trading_balance_converted = TryInto::<u128>::try_into(trading_balance).ok().unwrap();
-                if Self::has_balance_for_trading(orders.into_ref(), trading_balance_converted, quantity, order_id) {
-                    Some(order_book)
-                } else {
+                if let Some(trading_balance_converted ) = TryInto::<u128>::try_into(trading_balance).ok(){
+                    if Self::has_balance_for_trading(orders.into_ref(), trading_balance_converted, quantity, order_id) {
+                        Some(order_book)
+                    } else {
+                        None
+                    }
+                }else{
                     None
                 }
             }
@@ -310,11 +315,14 @@ impl<T: Trait> Module<T> {
                 //  Check if price*quantity is available in the base_asset.
                 let base_balance = pallet_generic_asset::Module::<T>::free_balance(&base_asset_id, &origin);
                 // TODO: unwrap() has a chance to panic. Remove it!
-                let base_balance_converted = TryInto::<u128>::try_into(base_balance).ok().unwrap();
-                let computed_trade_amount = (&price).checked_mul(quantity).unwrap();
-                if Self::has_balance_for_trading(orders.into_ref(), base_balance_converted, computed_trade_amount, order_id) {
-                    Some(order_book)
-                } else {
+                if let Some(base_balance_converted) = TryInto::<u128>::try_into(base_balance).ok(){
+                    let computed_trade_amount = (&price).checked_mul(quantity).unwrap();
+                    if Self::has_balance_for_trading(orders.into_ref(), base_balance_converted, computed_trade_amount, order_id) {
+                        Some(order_book)
+                    } else {
+                        None
+                    }
+                }else{
                     None
                 }
             }
