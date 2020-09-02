@@ -139,7 +139,7 @@ fn testnet_genesis(
 	_enable_println: bool,
 ) -> GenesisConfig {
 	const STASH: Balance = 100;
-	const UNIT: u128 = 1_000_000_000_000_000_000;
+	const UNIT: u128 = 1_000_000_000_000;
 	GenesisConfig {
 		frame_system: Some(SystemConfig {
 			// Add Wasm runtime to storage.
@@ -182,7 +182,7 @@ fn testnet_genesis(
 		}),
 		pallet_generic_asset: Some(GenericAssetConfig{
 			assets: vec![0],
-			initial_balance: 100*UNIT,
+			initial_balance: 2*UNIT,
 			endowed_accounts: endowed_accounts
 				.clone().into_iter().map(Into::into).collect(),
 			next_asset_id: 1,

@@ -11,6 +11,7 @@ use sp_arithmetic::{FixedU128, FixedPointNumber};
 use sp_std::convert::{TryInto};
 use sp_std::vec::Vec;
 use pallet_generic_asset::AssetIdProvider;
+
 pub mod binary_heap;
 mod engine;
 
@@ -31,10 +32,12 @@ pub trait Trait: frame_system::Trait + pallet_generic_asset::Trait {
 // Pallets use events to inform users when important changes are made.
 // https://substrate.dev/docs/en/knowledgebase/runtime/events
 decl_event!(
-	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId {
+	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId,
+	 Balance = <T as pallet_generic_asset::Trait>::Balance,
+	  BlockNumber = <T as frame_system::Trait>::BlockNumber{
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
-		TradeAmount(FixedU128, AccountId),
+		TradeAmount(Balance, FixedU128, AccountId),
 		/// Not enough asset free balance for placing the trade
 		InsufficientAssetBalance(FixedU128),
 		/// Order contains a duplicate orderId of another active order
@@ -51,6 +54,8 @@ decl_event!(
 		NoBalanceOfAssets(u128,u128),
 		/// When a new TradingPair is created
 		TradingPairCreated(u32),
+		/// New Order created
+		NewOrderCreated(Vec<u8>,engine::OrderType,FixedU128,FixedU128,AccountId,BlockNumber)
 		/// Contains market state about current block.
 		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
 		MarketData(u32,u32,FixedU128,FixedU128,FixedU128,FixedU128,FixedU128),
@@ -156,18 +161,21 @@ decl_module! {
 		  trading_pair: u32) -> dispatch::DispatchResult{
 		let trader = ensure_signed(origin)?;
 
-		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type,order_id){
+		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type.clone(),order_id.clone()){
 
 		Some(order_book) => {
 		// TODO: Reserve the balance
 		// TODO: Update the market data struct
 		// TODO: Try to execute order else put it in the order book
 		// TODO: Update the market data struct
-		// Refer the fixed point to floating point converter for more information. The given function works!!
+		Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,trading_pair,&trader);
 		let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
-
+		if let Some(trade_amount_converted) = Self::convert_fixed_u128_to_balance(trade_amount){
 		// Emit Event
-		Self::deposit_event(RawEvent::TradeAmount(trade_amount, trader));
+		Self::deposit_event(RawEvent::TradeAmount(trade_amount_converted, trade_amount, trader));
+		}else{
+		return Err(<Error<T>>::BasicOrderChecksFailed.into());
+		}
 		         },
 		None => {
 		return Err(<Error<T>>::BasicOrderChecksFailed.into());
@@ -292,8 +300,6 @@ impl<T: Trait> Module<T> {
 
         let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
 
-        FixedU128::from(12);
-
         let trading_asset_id = order_book.get_trading_asset();
         let base_asset_id = order_book.get_base_asset();
         let orders = order_book.get_orders();
@@ -302,29 +308,30 @@ impl<T: Trait> Module<T> {
             engine::OrderType::AskLimit | engine::OrderType::AskMarket => {
                 // Check if that much quantity is available
                 let trading_balance = pallet_generic_asset::Module::<T>::free_balance(&trading_asset_id, &origin);
-                // TODO: unwrap() has a chance to panic. Remove it!
-                if let Some(trading_balance_converted ) = TryInto::<u128>::try_into(trading_balance).ok(){
-                    if Self::has_balance_for_trading(orders.into_ref(), FixedU128::from(trading_balance_converted), quantity, order_id) {
+                if let Some(trading_balance_converted) = Self::convert_balance_to_fixed_u128(trading_balance) {
+                    if Self::has_balance_for_trading(orders.into_ref(), trading_balance_converted, quantity, order_id) {
                         Some(order_book)
                     } else {
                         None
                     }
-                }else{
+                } else {
                     None
                 }
             }
             engine::OrderType::BidLimit | engine::OrderType::BidMarket => {
                 //  Check if price*quantity is available in the base_asset.
                 let base_balance = pallet_generic_asset::Module::<T>::free_balance(&base_asset_id, &origin);
-                // TODO: unwrap() has a chance to panic. Remove it!
-                if let Some(base_balance_converted) = TryInto::<u128>::try_into(base_balance).ok(){
-                    let computed_trade_amount = (&price).checked_mul(&quantity).unwrap();
-                    if Self::has_balance_for_trading(orders.into_ref(), FixedU128::from(base_balance_converted), computed_trade_amount, order_id) {
-                        Some(order_book)
+                if let Some(base_balance_converted) = Self::convert_balance_to_fixed_u128(base_balance) {
+                    if let Some(computed_trade_amount) = (&price).checked_mul(&quantity) {
+                        if Self::has_balance_for_trading(orders.into_ref(), base_balance_converted, computed_trade_amount, order_id) {
+                            Some(order_book)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                }else{
+                } else {
                     None
                 }
             }
@@ -364,22 +371,82 @@ impl<T: Trait> Module<T> {
     }
 
     /// Converts Balance to FixedU128 representation
-    pub fn convert_balance_to_fixed_u128(x: T::Balance) ->Option<FixedU128>{
-        if let Some(y) = TryInto::<u128>::try_into(x).ok(){
-            // FixedU128::from(y).checked_mul(&FixedU128::from(1000000))
+    pub fn convert_balance_to_fixed_u128(x: T::Balance) -> Option<FixedU128> {
+        if let Some(y) = TryInto::<u128>::try_into(x).ok() {
             FixedU128::from(y).checked_div(&FixedU128::from(1_000_000_000_000))
-        }else{
+        } else {
             None
         }
     }
 
     /// Converts FixedU128 to Balance representation
-    pub fn convert_fixed_u128_to_balance(x: FixedU128) -> Option<T::Balance>{
-        if let Some(balance_in_FixedU128) = x.checked_div(&FixedU128::from(1000000)){
+    pub fn convert_fixed_u128_to_balance(x: FixedU128) -> Option<T::Balance> {
+        if let Some(balance_in_FixedU128) = x.checked_div(&FixedU128::from(1000000)) {
             let balance_in_u128 = balance_in_FixedU128.into_inner();
             Some(UniqueSaturatedFrom::<u128>::unique_saturated_from(balance_in_u128))
-        }else{
+        } else {
             None
+        }
+    }
+
+    fn execute_normal_order(order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
+                            order_type: engine::OrderType,
+                            order_id: sp_std::vec::Vec<u8>,
+                            price: FixedU128,
+                            quantity: FixedU128,
+                            trading_pair: u32,
+                            trader: &<T as frame_system::Trait>::AccountId) {
+        match order_type {
+            // Buy Limit Order
+            engine::OrderType::BidLimit => {
+                let mut asks = order_book.get_asks(); // Not sure if it will work, it is called using reference
+                loop {
+                    if let Some(counter_price_level) = asks.pop() {
+                        if counter_price_level.get_price_level() <= &price {
+                            // There are orders and counter_price_level matches asked_price_level
+                            let mut orders = counter_price_level.get_orders();
+                            let matched = false;
+                            for order in orders.iter_mut() {
+                                let counter_quantity = order.get_quantity();
+                                if counter_quantity > &quantity {
+                                    // partially execute counter order
+                                    // fully execute current order
+                                    // push front the remaining counter order
+                                } else if counter_quantity == &quantity {
+                                    // fully execute current order
+                                    // fully execute counter order
+                                    // Remove both orders
+                                } else {
+                                    // fully execute counter order
+                                    // partially execute current order
+                                    // pop another order from queue or insert new bid in bids
+                                }
+                            }
+                            if !matched {
+                                // current order is remaining so check for other price_level
+                            } else {
+                                // current order executed completely
+                                // save the state, deposit events and exit
+                                break;
+                            }
+                        } else {
+                            // There are orders but not at asked price_level so add this order to bids
+                            break
+                        }
+                    } else {
+                        // There are no orders in the heap so add this order to bids
+                        break
+                    }
+                }
+            }
+            // Sell Limit Order
+            engine::OrderType::AskLimit => {}
+            // Buy Market Order
+            engine::OrderType::BidMarket => {}
+            // Sell Market Order
+            engine::OrderType::AskMarket => {}
+            // TODO:  Ignores other cases maybe should we generate an event for it?
+            _ => {}
         }
     }
 }

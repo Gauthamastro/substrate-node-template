@@ -44,10 +44,46 @@ pub struct Order<AccountId, BlockNumber> {
     expiry: BlockNumber,
 }
 
+impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
+    pub fn get_origin(&self) -> &AccountId {
+        return &self.origin;
+    }
+
+    pub fn get_quantity(&self) -> &FixedU128{
+        return &self.quantity;
+    }
+
+    pub fn get_price(&self) -> &FixedU128{
+        return &self.quantity;
+    }
+
+    pub fn get_expiry(&self) -> &BlockNumber{
+        return &self.expiry;
+    }
+
+    pub fn get_id(&self) -> &Vec<u8>{
+        return &self.id;
+    }
+
+    pub fn get_order_type(&self) -> &OrderType{
+        return &self.order_type;
+    }
+}
+
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct PriceLevel<AccountId, BlockNumber> {
     price_level: FixedU128,
     queue: VecDeque<Order<AccountId, BlockNumber>>,
+}
+
+impl<AccoundId,BlockNumber> PriceLevel<AccoundId,BlockNumber>{
+    pub fn get_price_level(&self) -> &FixedU128 {
+        &self.price_level
+    }
+
+    pub fn get_orders(&self) -> &VecDeque<Order<AccoundId, BlockNumber>> {
+        &self.queue
+    }
 }
 
 impl<AccountId, BlockNumber> Ord for PriceLevel<AccountId, BlockNumber> {
@@ -81,9 +117,9 @@ pub struct OrderBook<AccountId, BlockNumber, AssetId> {
     pub(crate) nonce: u64,
     pub(crate) orders: btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>>,
     pub(crate) advanced_bid_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    pub(crate) advanced_ask_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator>,
+    pub(crate) advanced_ask_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>,
     pub(crate) bids: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
-    pub(crate) asks: BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator>,
+    pub(crate) asks: BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>,
     pub(crate) market_data: Vec<MarketData<BlockNumber>>,
     pub(crate) enabled: bool,
 }
@@ -99,6 +135,22 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
 
     pub fn get_orders(&self) -> &btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>> {
         return &self.orders;
+    }
+
+    pub fn get_asks(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+        return &self.asks;
+    }
+
+    pub fn get_bids(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return &self.bids;
+    }
+
+    pub fn get_advanced_asks(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+        return &self.advanced_ask_orders;
+    }
+
+    pub fn get_advanced_bids(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return &self.advanced_bid_orders;
     }
 }
 
@@ -156,27 +208,26 @@ impl<AccountId, BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId, Bloc
 impl<AccountId, BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId, BlockNumber>> {}
 
 
-
 // For MinComparator Binary-Heap
-impl<AccountId, BlockNumber> Ord for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+impl<AccountId, BlockNumber> Ord for BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
     fn cmp(&self, _other: &Self) -> Ordering {
         Ordering::Equal
     }
 }
 
-impl<AccountId, BlockNumber> PartialOrd for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+impl<AccountId, BlockNumber> PartialOrd for BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
     fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
         Some(Ordering::Equal)
     }
 }
 
-impl<AccountId, BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {
+impl<AccountId, BlockNumber> PartialEq for BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
     fn eq(&self, _other: &Self) -> bool {
         false
     }
 }
 
-impl<AccountId, BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId, BlockNumber>,MinComparator> {}
+impl<AccountId, BlockNumber> Eq for BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {}
 
 
 
