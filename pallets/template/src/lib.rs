@@ -55,7 +55,7 @@ decl_event!(
 		/// When a new TradingPair is created
 		TradingPairCreated(u32),
 		/// New Order created
-		NewOrderCreated(Vec<u8>,engine::OrderType,FixedU128,FixedU128,AccountId,BlockNumber)
+		NewOrderCreated(Vec<u8>,engine::OrderType,FixedU128,FixedU128,AccountId,BlockNumber),
 		/// Contains market state about current block.
 		/// Order: tradingPair,blockNumber,opening_bid,opening_ask,closing_bid,closing_ask,volume
 		MarketData(u32,u32,FixedU128,FixedU128,FixedU128,FixedU128,FixedU128),
@@ -389,17 +389,19 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn execute_normal_order(order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
+    fn execute_normal_order(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
                             order_type: engine::OrderType,
                             order_id: sp_std::vec::Vec<u8>,
                             price: FixedU128,
                             quantity: FixedU128,
                             trading_pair: u32,
                             trader: &<T as frame_system::Trait>::AccountId) {
+        // TODO: There are lot of problems with borrow and reference management
+        // TODO: A lot of checking is required
         match order_type {
             // Buy Limit Order
             engine::OrderType::BidLimit => {
-                let mut asks = order_book.get_asks(); // Not sure if it will work, it is called using reference
+                let mut asks = order_book.get_asks();
                 loop {
                     if let Some(counter_price_level) = asks.pop() {
                         if counter_price_level.get_price_level() <= &price {

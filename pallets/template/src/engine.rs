@@ -8,7 +8,7 @@ use sp_std::collections::btree_map;
 
 pub type TradingPair = u32;
 
-#[derive(Encode, Decode, Clone, PartialEq, Debug)]
+#[derive(Encode, Decode, Clone, Eq, PartialEq, Debug)]
 pub enum OrderType {
     BidLimit,
     BidMarket,
@@ -81,8 +81,8 @@ impl<AccoundId,BlockNumber> PriceLevel<AccoundId,BlockNumber>{
         &self.price_level
     }
 
-    pub fn get_orders(&self) -> &VecDeque<Order<AccoundId, BlockNumber>> {
-        &self.queue
+    pub fn get_orders(self) -> VecDeque<Order<AccoundId, BlockNumber>> {
+        self.queue
     }
 }
 
@@ -137,20 +137,20 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
         return &self.orders;
     }
 
-    pub fn get_asks(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
-        return &self.asks;
+    pub fn get_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+        return self.asks;
     }
 
-    pub fn get_bids(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
-        return &self.bids;
+    pub fn get_bids(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return self.bids;
     }
 
-    pub fn get_advanced_asks(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
-        return &self.advanced_ask_orders;
+    pub fn get_advanced_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+        return self.advanced_ask_orders;
     }
 
-    pub fn get_advanced_bids(&self) -> &BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
-        return &self.advanced_bid_orders;
+    pub fn get_advanced_bids(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return self.advanced_bid_orders;
     }
 }
 
