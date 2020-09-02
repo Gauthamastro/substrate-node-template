@@ -7,12 +7,11 @@
 use frame_support::{decl_module, decl_storage, decl_event, decl_error, dispatch};
 use frame_system::ensure_signed;
 use sp_std::str;
-use sp_arithmetic::FixedU128;
-use sp_std::convert::TryInto;
+use sp_arithmetic::{FixedU128, FixedPointNumber};
+use sp_std::convert::{TryInto};
 use sp_std::vec::Vec;
 use pallet_generic_asset::AssetIdProvider;
-
-mod binary_heap;
+pub mod binary_heap;
 mod engine;
 
 #[cfg(test)]
@@ -214,7 +213,7 @@ decl_module! {
 use sp_std::collections::btree_map;
 use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
 use frame_support::traits::IsType;
-use sp_arithmetic::traits::CheckedMul;
+use sp_arithmetic::traits::{CheckedMul, CheckedDiv, UniqueSaturatedFrom};
 
 impl<T: Trait> Module<T> {
     // fn encode_and_update_nonce() -> Vec<u8> {
@@ -293,6 +292,7 @@ impl<T: Trait> Module<T> {
 
         let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
 
+        FixedU128::from(12);
 
         let trading_asset_id = order_book.get_trading_asset();
         let base_asset_id = order_book.get_base_asset();
@@ -361,5 +361,25 @@ impl<T: Trait> Module<T> {
             Self::deposit_event(RawEvent::InsufficientAssetBalance(balance_to_check));
             false
         };
+    }
+
+    /// Converts Balance to FixedU128 representation
+    pub fn convert_balance_to_fixed_u128(x: T::Balance) ->Option<FixedU128>{
+        if let Some(y) = TryInto::<u128>::try_into(x).ok(){
+            // FixedU128::from(y).checked_mul(&FixedU128::from(1000000))
+            FixedU128::from(y).checked_div(&FixedU128::from(1_000_000_000_000))
+        }else{
+            None
+        }
+    }
+
+    /// Converts FixedU128 to Balance representation
+    pub fn convert_fixed_u128_to_balance(x: FixedU128) -> Option<T::Balance>{
+        if let Some(balance_in_FixedU128) = x.checked_div(&FixedU128::from(1000000)){
+            let balance_in_u128 = balance_in_FixedU128.into_inner();
+            Some(UniqueSaturatedFrom::<u128>::unique_saturated_from(balance_in_u128))
+        }else{
+            None
+        }
     }
 }

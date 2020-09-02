@@ -34,7 +34,6 @@ pub use sp_runtime::BuildStorage;
 pub use pallet_staking::StakerStatus;
 
 use pallet_session::{historical as pallet_session_historical};
-
 pub use pallet_timestamp::Call as TimestampCall;
 // pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};

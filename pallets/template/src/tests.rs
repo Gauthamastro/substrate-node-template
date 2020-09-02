@@ -1,24 +1,52 @@
-use crate::{Error, mock::*};
+use crate::{Error, mock::*, Trait};
 use frame_support::{assert_ok, assert_noop};
+use sp_arithmetic::{FixedU128, FixedPointNumber};
+use sp_arithmetic::traits::{CheckedDiv, UniqueSaturatedFrom};
+
+#[test]
+fn balance_FixedU128_integer_conversion_works(){
+	let value = FixedU128::from(2);
+	println!("Value for Testing: {}",value);
+	let balance_converted = TemplateModule::convert_fixed_u128_to_balance(value);
+	assert!(balance_converted.is_some());
+	println!("Value in Substrate Balance type (u128): {}",balance_converted.unwrap()); // This is 10^12
+	let balance: Option<FixedU128> = TemplateModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
+	assert!(balance.is_some());
+	println!("Value after converting back to FixedU128 type: {}",balance.unwrap());
+	assert_eq!(balance,Some(value));
+}
+
+#[test]
+fn balance_fixed_u128_float_conversion_works(){
+	let value = FixedU128::from_fraction(2.3456789);
+	println!("Value for Testing: {}",value);
+	let balance_converted = TemplateModule::convert_fixed_u128_to_balance(value);
+	assert!(balance_converted.is_some());
+	println!("Value in Substrate Balance type (u128): {}",balance_converted.unwrap()); // This is 10^12
+	let balance: Option<FixedU128> = TemplateModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
+	assert!(balance.is_some());
+	println!("Value after converting back to FixedU128 type: {}",balance.unwrap());
+	assert_eq!(balance,Some(value));
+}
 
 #[test]
 fn it_works_for_default_value() {
 	new_test_ext().execute_with(|| {
 		// Dispatch a signed extrinsic.
-		assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
-		// Read pallet storage and assert an expected result.
-		assert_eq!(TemplateModule::something(), Some(42));
+		// assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
+		// // Read pallet storage and assert an expected result.
+		// assert_eq!(TemplateModule::something(), Some(42));
 	});
 }
 
 #[test]
 fn correct_error_for_none_value() {
 	new_test_ext().execute_with(|| {
-		// Ensure the expected error is thrown when no value is present.
-		assert_noop!(
-			TemplateModule::cause_error(Origin::signed(1)),
-			Error::<Test>::NoneValue
-		);
+		// // Ensure the expected error is thrown when no value is present.
+		// assert_noop!(
+		// 	TemplateModule::cause_error(Origin::signed(1)),
+		// 	Error::<Test>::NoneValue
+		// );
 	});
 }
 

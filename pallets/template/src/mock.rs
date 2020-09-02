@@ -5,6 +5,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup}, testing::Header, Perbill,
 };
 use frame_system as system;
+use pallet_generic_asset::Event;
 
 impl_outer_origin! {
 	pub enum Origin for Test {}
@@ -52,7 +53,11 @@ impl system::Trait for Test {
 impl Trait for Test {
 	type Event = ();
 }
-
+impl pallet_generic_asset::Trait for Test{
+	type Balance = u128;
+	type AssetId = u32;
+	type Event = ();
+}
 pub type TemplateModule = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
