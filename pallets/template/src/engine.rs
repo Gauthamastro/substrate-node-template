@@ -36,12 +36,13 @@ impl Default for OrderType {
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
 pub struct Order<AccountId, BlockNumber> {
-    id: Vec<u8>,
-    order_type: OrderType,
-    price: FixedU128,
-    quantity: FixedU128,
-    origin: AccountId,
-    expiry: BlockNumber,
+    pub(crate) id: Vec<u8>,
+    pub(crate) order_type: OrderType,
+    pub(crate) price: FixedU128,
+    pub(crate) quantity: FixedU128,
+    pub(crate) market_maker: bool,
+    pub(crate) origin: AccountId,
+    pub(crate) expiry: BlockNumber,
 }
 
 impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
@@ -68,12 +69,16 @@ impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
     pub fn get_order_type(&self) -> &OrderType{
         return &self.order_type;
     }
+
+    pub fn set_quantity(&mut self, new_quantity: FixedU128){
+        self.quantity = new_quantity
+    }
 }
 
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct PriceLevel<AccountId, BlockNumber> {
-    price_level: FixedU128,
-    queue: VecDeque<Order<AccountId, BlockNumber>>,
+    pub(crate) price_level: FixedU128,
+    pub(crate) queue: VecDeque<Order<AccountId, BlockNumber>>,
 }
 
 impl<AccoundId,BlockNumber> PriceLevel<AccoundId,BlockNumber>{
@@ -81,8 +86,12 @@ impl<AccoundId,BlockNumber> PriceLevel<AccoundId,BlockNumber>{
         &self.price_level
     }
 
-    pub fn get_orders(self) -> VecDeque<Order<AccoundId, BlockNumber>> {
-        self.queue
+    pub fn get_orders(&self) -> &VecDeque<Order<AccoundId, BlockNumber>> {
+        &self.queue
+    }
+
+    pub fn get_orders_mut(&mut self) -> &mut VecDeque<Order<AccoundId, BlockNumber>>{
+        &mut self.queue
     }
 }
 
@@ -137,13 +146,21 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
         return &self.orders;
     }
 
-    pub fn get_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
-        return self.asks;
+    pub fn get_asks(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+        return &mut self.asks;
     }
 
-    pub fn get_bids(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
-        return self.bids;
+    // pub fn set_asks(&mut self, asks: &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>)  {
+    //      &self.asks = asks;
+    // }
+
+    pub fn get_bids(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return &mut self.bids;
     }
+
+    // pub fn set_bids(&mut self, bids: &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MaxComparator>) {
+    //     &self.bids = bids;
+    // }
 
     pub fn get_advanced_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
         return self.advanced_ask_orders;
