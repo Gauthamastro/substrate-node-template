@@ -43,6 +43,12 @@ decl_event!(
 	  BlockNumber = <T as frame_system::Trait>::BlockNumber{
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
+
+		/// Triggered when asks.peek() returns None
+		AsksHeapEmpty,
+		/// Triggered when bids.peek() returns None
+		BidsHeapEmpty,
+		/// The traded amount
 		TradeAmount(Balance, FixedU128, AccountId),
 		/// Not enough asset free balance for placing the trade
 		InsufficientAssetBalance(FixedU128),
@@ -174,7 +180,7 @@ decl_module! {
 		// TODO: Update the market data struct
 		// TODO: Try to execute order else put it in the order book
 		// TODO: Update the market data struct
-		order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,trading_pair,&trader);
+		order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,&trader);
 		<Books<T>>::insert(trading_pair,order_book); // Modifies the state to insert new order_book
 		// let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
 		// if let Some(trade_amount_converted) = Self::convert_fixed_u128_to_balance(trade_amount){
@@ -396,7 +402,6 @@ impl<T: Trait> Module<T> {
                             order_id: sp_std::vec::Vec<u8>,
                             price: FixedU128,
                             quantity: FixedU128,
-                            trading_pair: u32,
                             trader: &<T as frame_system::Trait>::AccountId)
                             -> OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
         // TODO: There might be lot of problems with borrow and reference management
@@ -471,50 +476,7 @@ impl<T: Trait> Module<T> {
                         } else {
                             // There are orders but not at asked price_level so add this order to bids
                             // current_order is market maker so no fees
-                            let bids = order_book.get_bids();
-                            let mut price_level_match = false;
-                            current_order = match bids.peek() {
-                                Some(current_price_level) => {
-                                    if current_price_level.get_price_level() != current_order.get_price() {
-                                        // current_order price and price_level doesn't match
-                                        // Create one and put it in
-                                        let mut new_price_level = engine::PriceLevel {
-                                            price_level: *current_order.get_price(),
-                                            queue: VecDeque::new(),
-                                        };
-                                        new_price_level.get_orders_mut().push_back(current_order.clone());
-                                        bids.push(new_price_level);
-                                        current_order
-                                    } else {
-                                        // Price and price_level matches
-                                        // Add it to queue of this price_level
-                                        price_level_match = true;
-                                        current_order
-                                    }
-                                }
-                                None => {
-                                    // There are not price levels available
-                                    // Create one and put it in
-                                    let mut new_price_level = engine::PriceLevel {
-                                        price_level: *current_order.get_price(),
-                                        queue: VecDeque::new(),
-                                    };
-                                    new_price_level.get_orders_mut().push_back(current_order.clone());
-                                    bids.push(new_price_level);
-                                    current_order
-                                }
-                            };
-                            if price_level_match {
-                                if let Some(mut current_price_level) = bids.peek_mut() {
-                                    current_price_level.get_orders_mut().push_back(current_order);
-                                } else {}
-                            }
-                            // if let Some(mut current_price_level) = bids.peek_mut() {
-                            //
-                            // } else {
-                            //
-                            // }
-                            // order_book.bids = *bids;
+                            order_book = Self::add_to_bids(order_book,current_order);
                             break;
                         }
                     } else {
@@ -522,46 +484,7 @@ impl<T: Trait> Module<T> {
                         // current_order is market maker so no fees
                         // There are orders but not at asked price_level so add this order to bids
                         // current_order is market maker so no fees
-                        let bids = order_book.get_bids();
-                        let mut price_level_match = false;
-                        current_order = match bids.peek() {
-                            Some(current_price_level) => {
-                                if current_price_level.get_price_level() != current_order.get_price() {
-                                    // current_order price and price_level doesn't match
-                                    // Create one and put it in
-                                    let mut new_price_level = engine::PriceLevel {
-                                        price_level: *current_order.get_price(),
-                                        queue: VecDeque::new(),
-                                    };
-                                    new_price_level.get_orders_mut().push_back(current_order.clone());
-                                    bids.push(new_price_level);
-                                    current_order
-                                } else {
-                                    // Price and price_level matches
-                                    // Add it to queue of this price_level
-                                    price_level_match = true;
-                                    current_order
-                                }
-                            }
-                            None => {
-                                // There are not price levels available
-                                // Create one and put it in
-                                let mut new_price_level = engine::PriceLevel {
-                                    price_level: *current_order.get_price(),
-                                    queue: VecDeque::new(),
-                                };
-                                new_price_level.get_orders_mut().push_back(current_order.clone());
-                                bids.push(new_price_level);
-                                current_order
-                            }
-                        };
-                        if price_level_match {
-                            if let Some(mut current_price_level) = bids.peek_mut() {
-                                current_price_level.get_orders_mut().push_back(current_order);
-                            } else {
-                                // Throw an Error here
-                            }
-                        }
+                        order_book = Self::add_to_bids(order_book,current_order);
                         break;
                     }
                 }
@@ -667,5 +590,54 @@ impl<T: Trait> Module<T> {
                 executing_order
             }
         };
+    }
+
+    fn add_to_bids(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
+    mut current_order: Order<T::AccountId,T::BlockNumber>)
+                   -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
+
+        Self::deposit_event(RawEvent::AsksHeapEmpty);
+        let bids = order_book.get_bids();
+        let mut price_level_match = false;
+        current_order = match bids.peek() {
+            Some(current_price_level) => {
+                if current_price_level.get_price_level() != current_order.get_price() {
+                    // current_order price and price_level doesn't match
+                    // Create one and put it in
+                    let mut new_price_level = engine::PriceLevel {
+                        price_level: *current_order.get_price(),
+                        queue: VecDeque::new(),
+                    };
+                    new_price_level.get_orders_mut().push_back(current_order.clone());
+                    bids.push(new_price_level);
+                    current_order
+                } else {
+                    // Price and price_level matches
+                    // Add it to queue of this price_level
+                    price_level_match = true;
+                    current_order
+                }
+            }
+            None => {
+                // There are not price levels available
+                // Create one and put it in
+                Self::deposit_event(RawEvent::BidsHeapEmpty);
+                let mut new_price_level = engine::PriceLevel {
+                    price_level: *current_order.get_price(),
+                    queue: VecDeque::new(),
+                };
+                new_price_level.get_orders_mut().push_back(current_order.clone());
+                bids.push(new_price_level);
+                current_order
+            }
+        };
+        if price_level_match {
+            if let Some(mut current_price_level) = bids.peek_mut() {
+                current_price_level.get_orders_mut().push_back(current_order);
+            } else {
+                // Throw an Error here
+            }
+        }
+        order_book
     }
 }
