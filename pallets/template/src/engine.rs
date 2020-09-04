@@ -55,7 +55,7 @@ impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
     }
 
     pub fn get_price(&self) -> &FixedU128{
-        return &self.quantity;
+        return &self.price;
     }
 
     pub fn get_expiry(&self) -> &BlockNumber{
@@ -82,6 +82,7 @@ pub struct PriceLevel<AccountId, BlockNumber> {
 }
 
 impl<AccoundId,BlockNumber> PriceLevel<AccoundId,BlockNumber>{
+
     pub fn get_price_level(&self) -> &FixedU128 {
         &self.price_level
     }
@@ -146,7 +147,7 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
         return &self.orders;
     }
 
-    pub fn get_asks(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
+    pub fn get_asks_mut(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
         return &mut self.asks;
     }
 
@@ -154,12 +155,16 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
     //      &self.asks = asks;
     // }
 
-    pub fn get_bids(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+    pub fn get_bids_mut(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
         return &mut self.bids;
     }
 
+    pub fn get_bids(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
+        return self.bids;
+    }
+
     // pub fn set_bids(&mut self, bids: &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MaxComparator>) {
-    //     &self.bids = bids;
+    //     &mut self.bids = bids;
     // }
 
     pub fn get_advanced_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator> {
