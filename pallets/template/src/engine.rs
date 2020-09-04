@@ -151,9 +151,9 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
         return &mut self.asks;
     }
 
-    // pub fn set_asks(&mut self, asks: &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>)  {
-    //      &self.asks = asks;
-    // }
+    pub fn get_asks(self) -> BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>{
+        return self.asks
+    }
 
     pub fn get_bids_mut(&mut self) -> &mut BinaryHeap<PriceLevel<AccountId, BlockNumber>> {
         return &mut self.bids;

@@ -44,10 +44,14 @@ decl_event!(
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 
+        /// New order added to AsksHeap [price,quantity]
+        NewAskOrderAdded(FixedU128,FixedU128),
 		/// New order added to BidsHeap [price,quantity]
 		NewBidOrderAdded(FixedU128,FixedU128),
 		/// There is a price level match in BidsHeap [bidsOrder,currentOrder]
 		PriceLevelMatchBidsHeap(FixedU128,FixedU128),
+		/// There is a price level match in AsksHeap [bidsOrder,currentOrder]
+		PriceLevelMatchAsksHeap(FixedU128,FixedU128),
 		/// Triggered when asks.peek() returns None
 		AsksHeapEmpty,
 		/// Triggered when bids.peek() returns None
@@ -132,7 +136,7 @@ decl_module! {
 		/// and trading pairs.
 		/// trading pair notation: trading_asset/base_asset
 		#[weight = 10000]
-		pub fn register_new_orderbook(origin, trading_asset_id: u32, base_asset_id: u32) -> dispatch::DispatchResult{
+		pub fn register_new_orderbook(origin, trading_asset_id: u32, base_asset_id: u32) -> dispatch::DispatchResultWithPostInfo{
 		let _trader = ensure_signed(origin)?;
 		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
 		// TODO: pair
@@ -153,7 +157,7 @@ decl_module! {
 		// Create the orderbook
 		let trading_pair_id = Self::create_order_book(Self::u32_to_asset_id(trading_asset_id),Self::u32_to_asset_id(base_asset_id));
 		Self::deposit_event(RawEvent::TradingPairCreated(trading_pair_id));
-		return Ok(());
+		return Ok(Some(0).into());
 		}else{
 		return Err(<Error<T>>::InsufficientAssetBalance.into());
 		}
@@ -174,15 +178,12 @@ decl_module! {
 		  order_id: sp_std::vec::Vec<u8>,
 		  price: FixedU128,
 		  quantity: FixedU128,
-		  trading_pair: u32) -> dispatch::DispatchResult{
+		  trading_pair: u32) -> dispatch::DispatchResultWithPostInfo{
 		let trader = ensure_signed(origin)?;
 
 		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type.clone(),order_id.clone()){
 
 		Some(mut order_book) => {
-		// TODO: Reserve the balance
-		// TODO: Update the market data struct
-		// TODO: Try to execute order else put it in the order book
 		// TODO: Update the market data struct
 		order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,&trader);
 		<Books<T>>::insert(trading_pair,order_book); // Modifies the state to insert new order_book
@@ -198,7 +199,7 @@ decl_module! {
 		return Err(<Error<T>>::BasicOrderChecksFailed.into());
 		        }
 		    }
-		Ok(())
+		Ok(Some(0).into())
 		}
 
 		// This function can be used to submit market orders
@@ -207,10 +208,21 @@ decl_module! {
 		  order_type: engine::OrderType,
 		  order_id: sp_std::vec::Vec<u8>,
 		  price: FixedU128,
-		  quantity: FixedU128 ) -> dispatch::DispatchResult{
-		let _trader = ensure_signed(origin)?;
-		// TODO: Do the order logic for the given market order.
-		Ok(())
+		  quantity: FixedU128,
+		  trading_pair: u32) -> dispatch::DispatchResultWithPostInfo{
+		let trader = ensure_signed(origin)?;
+		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type.clone(),order_id.clone()){
+
+		    Some(mut order_book) => {
+		        // TODO: Update the market data struct
+		        order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,&trader);
+		        <Books<T>>::insert(trading_pair,order_book); // Modifies the state to insert new order_book
+		        },
+		    None => {
+		        return Err(<Error<T>>::BasicOrderChecksFailed.into());
+		        }
+	    }
+		Ok(Some(0).into())
 		}
 
 		// This function can be used to submit advanced orders
@@ -429,8 +441,8 @@ impl<T: Trait> Module<T> {
                     current_order.get_price().checked_mul(
                         current_order.get_quantity()).unwrap()).unwrap(); // TODO: Take care of these unwraps
                 let _ = pallet_generic_asset::Module::<T>::reserve(&base_asset_id,
-                                                           current_order.get_origin(),
-                                                           trade_amount); // It will never fail
+                                                                   current_order.get_origin(),
+                                                                   trade_amount); // It will never fail
 
                 let asks = order_book.get_asks_mut();
                 loop {
@@ -509,6 +521,87 @@ impl<T: Trait> Module<T> {
             }
             // Sell Limit Order
             engine::OrderType::AskLimit => {
+                // Reserve the price*quantity of base-asset
+                let quantity: T::Balance = Self::convert_fixed_u128_to_balance(
+                    *current_order.get_quantity()).unwrap(); // TODO: Take care of these unwraps
+                let _ = pallet_generic_asset::Module::<T>::reserve(&trading_asset_id,
+                                                                   current_order.get_origin(),
+                                                                   quantity); // It will never fail
+
+                let bids = order_book.get_bids_mut();
+                loop {
+                    if let Some(counter_price_level_peek) = bids.peek() {
+                        if counter_price_level_peek.get_price_level() >= &price {
+                            if let Some(mut counter_price_level) = bids.pop() {
+                                // There are orders and counter_price_level matches asked_price_level
+                                let orders = counter_price_level.get_orders_mut();
+                                let mut matched = false;
+                                for index in 0..orders.len() {
+                                    if let Some(mut counter_order) = orders.remove(index) {
+                                        let counter_quantity = counter_order.get_quantity();
+                                        if counter_quantity > current_order.get_quantity() {
+                                            // partially execute counter order
+                                            counter_order = Self::partially_execute_order(counter_order,
+                                                                                          &current_order,
+                                                                                          trading_asset_id.clone(),
+                                                                                          base_asset_id.clone());
+                                            // push front the remaining counter order
+                                            orders.push_front(counter_order);
+                                            matched = true;
+                                            break;
+                                        } else if counter_quantity == current_order.get_quantity() {
+                                            // fully execute current order
+                                            // fully execute counter order
+                                            Self::fully_execute_order(counter_order,
+                                                                      &current_order,
+                                                                      trading_asset_id.clone(),
+                                                                      base_asset_id.clone());
+                                            // Remove both orders
+                                            matched = true;
+                                            break;
+                                        } else {
+                                            // partially execute current order
+                                            // TODO: Price taken for calculation maybe wrong. Check it
+                                            current_order = Self::partially_execute_order(current_order,
+                                                                                          &counter_order,
+                                                                                          trading_asset_id.clone(),
+                                                                                          base_asset_id.clone());
+                                            // pop another order from queue or insert new bid in bids
+                                        }
+                                    }
+                                }
+                                if matched {
+                                    // current order executed completely
+                                    // save the state and exit
+                                    // If there are orders left in this price level put it back in the BinaryHeap
+                                    if !counter_price_level.get_orders().is_empty() {
+                                        bids.push(counter_price_level);
+                                    }
+                                    break;
+                                }
+                            } else {
+                                // It will not occur as peek will be None if price level is not there
+                            }
+                        } else {
+                            // There are orders but not at asked price_level so add this order to bids
+                            // current_order is market maker so no fees
+                            let current_order_cloned = current_order.clone();
+                            order_book = Self::add_to_asks(order_book, current_order);
+                            Self::deposit_event(RawEvent::NewAskOrderAdded(*current_order_cloned.get_price(), *current_order_cloned.get_quantity()));
+                            break;
+                        }
+                    } else {
+                        // There are no orders in the heap so add this order to bids
+                        // current_order is market maker so no fees
+                        // There are orders but not at asked price_level so add this order to bids
+                        // current_order is market maker so no fees
+                        let current_order_cloned = current_order.clone();
+                        order_book = Self::add_to_asks(order_book, current_order);
+                        Self::deposit_event(RawEvent::NewAskOrderAdded(*current_order_cloned.get_price(), *current_order_cloned.get_quantity()));
+                        break;
+                    }
+                }
+
                 order_book
             }
             // Buy Market Order
@@ -541,8 +634,14 @@ impl<T: Trait> Module<T> {
         return match executing_order.get_order_type() {
             engine::OrderType::BidLimit | engine::OrderType::BidMarket => {
                 // TODO: Remove the unwraps it can cause a panic
-                let trade_amount: T::Balance = Self::convert_fixed_u128_to_balance(
-                    executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                let trade_amount: T::Balance;
+                if executing_order.get_quantity() >= trigger_order.get_quantity() {
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                }else{
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                }
                 let trigger_quantity: T::Balance = Self::convert_fixed_u128_to_balance(*trigger_order.get_quantity()).unwrap();
                 // un-reserve price*quantity of base_asset from executing_order's origin
                 pallet_generic_asset::Module::<T>::unreserve(&base_asset_id,
@@ -571,10 +670,15 @@ impl<T: Trait> Module<T> {
                 executing_order
             }
             engine::OrderType::AskLimit | engine::OrderType::AskMarket => {
-                // TODO: Remove the unwraps it can cause a panic
-                let trade_amount: T::Balance = Self::convert_fixed_u128_to_balance(
-                    executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
-                let trigger_quantity: T::Balance = Self::convert_fixed_u128_to_balance(*trigger_order.get_quantity()).unwrap();
+                let trade_amount: T::Balance;
+                if executing_order.get_quantity() < trigger_order.get_quantity() {
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap(); // TODO: Remove the unwraps it can cause a panic
+                } else {
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap(); // TODO: Remove the unwraps it can cause a panic
+                }
+                let trigger_quantity: T::Balance = Self::convert_fixed_u128_to_balance(*trigger_order.get_quantity()).unwrap(); // TODO: Remove the unwraps it can cause a panic
                 // un-reserve quantity of trading_asset from executing_order's origin
                 pallet_generic_asset::Module::<T>::unreserve(&trading_asset_id,
                                                              executing_order.get_origin(),
@@ -611,7 +715,7 @@ impl<T: Trait> Module<T> {
     fn add_to_bids(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
                    current_order: Order<T::AccountId, T::BlockNumber>)
                    -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
-        Self::deposit_event(RawEvent::AsksHeapEmpty);
+        Self::deposit_event(RawEvent::AsksHeapEmpty); // TODO: Better Naming of Events. It can be Order not matched in AsksHeap
         let bids = order_book.clone().get_bids();
         let mut price_level_match = true;
         let mut bids_sorted_vec = bids.into_sorted_vec(); //TODO: This is going to be super duper expensive.
@@ -656,6 +760,57 @@ impl<T: Trait> Module<T> {
         // let mut bids_mut = order_book.get_bids_mut();
         // bids_mut = modified_bids;
         order_book.bids = modified_bids;
+        order_book
+    }
+
+    fn add_to_asks(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
+                   current_order: Order<T::AccountId, T::BlockNumber>)
+                   -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
+        Self::deposit_event(RawEvent::BidsHeapEmpty); // TODO: Better Naming of Events. It can be Order not matched in BidsHeap
+        let asks = order_book.clone().get_asks();
+        let mut price_level_match = true;
+        let mut asks_sorted_vec = asks.into_sorted_vec(); //TODO: This is going to be super duper expensive.
+        for index in 0..asks_sorted_vec.len() {
+            if asks_sorted_vec[index].get_price_level() != current_order.get_price() {
+                // current_order price and price_level doesn't match
+                // so we need to create one and put it in
+                price_level_match = false;
+            } else {
+                // Price and price_level matches
+                // Add it to queue of this price_level
+                Self::deposit_event(RawEvent::PriceLevelMatchAsksHeap(*asks_sorted_vec[index].get_price_level(),
+                                                                      *current_order.get_price()));
+                asks_sorted_vec[index].get_orders_mut().push_back(current_order.clone());
+                price_level_match = true;
+            }
+        }
+
+        //TODO: This is going to be super duper expensive.
+        let mut modified_asks = binary_heap::BinaryHeap::from_vec_cmp(asks_sorted_vec,binary_heap::MinComparator);
+
+        if modified_asks.is_empty() && price_level_match == true {
+            // There are no price levels available
+            // Create one and put it in
+            Self::deposit_event(RawEvent::AsksHeapEmpty);
+            let mut new_price_level = engine::PriceLevel {
+                price_level: *current_order.get_price(),
+                queue: VecDeque::new(),
+            };
+            new_price_level.get_orders_mut().push_back(current_order.clone());
+            modified_asks.push(new_price_level);
+        }
+        if !price_level_match && !modified_asks.is_empty() {
+            let mut new_price_level = engine::PriceLevel {
+                price_level: *current_order.get_price(),
+                queue: VecDeque::new(),
+            };
+            new_price_level.get_orders_mut().push_back(current_order.clone());
+            modified_asks.push(new_price_level);
+        }
+
+        // let mut bids_mut = order_book.get_bids_mut();
+        // bids_mut = modified_bids;
+        order_book.asks = modified_asks;
         order_book
     }
 }
