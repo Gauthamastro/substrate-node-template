@@ -6,6 +6,7 @@
 
 use frame_support::{decl_error, decl_event, decl_module, decl_storage, dispatch};
 use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
+use frame_support::traits::Get;
 use frame_system::ensure_signed;
 use pallet_generic_asset::AssetIdProvider;
 use sp_arithmetic::{FixedPointNumber, FixedU128};
@@ -17,7 +18,7 @@ use sp_std::str;
 use sp_std::vec::Vec;
 
 use crate::engine::{Order, OrderBook};
-use frame_support::traits::Get;
+
 pub mod binary_heap;
 mod engine;
 
@@ -189,41 +190,11 @@ decl_module! {
 		// TODO: Update the market data struct
 		order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,&trader);
 		<Books<T>>::insert(trading_pair,order_book); // Modifies the state to insert new order_book
-		// let trade_amount = Self::calculate_trade_amount(price,quantity).ok_or(<Error<T>>::CalculationOverflow)?;
-		// if let Some(trade_amount_converted) = Self::convert_fixed_u128_to_balance(trade_amount){
-		// // Emit Event
-		// Self::deposit_event(RawEvent::TradeAmount(trade_amount_converted, trade_amount, trader));
-		// }else{
-		// return Err(<Error<T>>::BasicOrderChecksFailed.into());
-		// }
 		         },
 		None => {
 		return Err(<Error<T>>::BasicOrderChecksFailed.into());
 		        }
 		    }
-		Ok(Some(0).into())
-		}
-
-		// This function can be used to submit market orders
-		#[weight = 10000]
-		pub fn submit_market_order(origin,
-		  order_type: engine::OrderType,
-		  order_id: sp_std::vec::Vec<u8>,
-		  price: FixedU128,
-		  quantity: FixedU128,
-		  trading_pair: u32) -> dispatch::DispatchResultWithPostInfo{
-		let trader = ensure_signed(origin)?;
-		match Self::basic_order_checks(&trader,trading_pair,price,quantity,order_type.clone(),order_id.clone()){
-
-		    Some(mut order_book) => {
-		        // TODO: Update the market data struct
-		        order_book = Self::execute_normal_order(order_book,order_type.clone(),order_id.clone(),price,quantity,&trader);
-		        <Books<T>>::insert(trading_pair,order_book); // Modifies the state to insert new order_book
-		        },
-		    None => {
-		        return Err(<Error<T>>::BasicOrderChecksFailed.into());
-		        }
-	    }
 		Ok(Some(0).into())
 		}
 
@@ -291,11 +262,6 @@ impl<T: Trait> Module<T> {
     }
     fn u32_to_asset_id(input: u32) -> T::AssetId {
         input.into()
-    }
-
-    /// Call this function to calculate trade amount based on given price and quantity
-    fn calculate_trade_amount(price: FixedU128, quantity: FixedU128) -> Option<FixedU128> {
-        price.checked_mul(&quantity)
     }
 
     /// Checks trading pair
@@ -632,14 +598,14 @@ impl<T: Trait> Module<T> {
                                trading_asset_id: T::AssetId,
                                base_asset_id: T::AssetId,
                                take_price_from_executing_order: bool) -> Order<T::AccountId, T::BlockNumber> {
-        return Self::fully_execute_order(executing_order, trigger_order, trading_asset_id, base_asset_id,take_price_from_executing_order);
+        return Self::fully_execute_order(executing_order, trigger_order, trading_asset_id, base_asset_id, take_price_from_executing_order);
     }
 
     fn fully_execute_order(mut executing_order: engine::Order<T::AccountId, T::BlockNumber>,
                            trigger_order: &engine::Order<T::AccountId, T::BlockNumber>,
                            trading_asset_id: T::AssetId,
                            base_asset_id: T::AssetId,
-                            take_price_from_executing_order: bool) -> Order<T::AccountId, T::BlockNumber> {
+                           take_price_from_executing_order: bool) -> Order<T::AccountId, T::BlockNumber> {
         return match executing_order.get_order_type() {
             engine::OrderType::BidLimit | engine::OrderType::BidMarket => {
                 // TODO: Remove the unwraps it can cause a panic
@@ -647,7 +613,7 @@ impl<T: Trait> Module<T> {
                 if take_price_from_executing_order {
                     trade_amount = Self::convert_fixed_u128_to_balance(
                         executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
-                }else{
+                } else {
                     trade_amount = Self::convert_fixed_u128_to_balance(
                         trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
                 }
@@ -684,7 +650,7 @@ impl<T: Trait> Module<T> {
                 if take_price_from_executing_order {
                     trade_amount = Self::convert_fixed_u128_to_balance(
                         executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
-                }else{
+                } else {
                     trade_amount = Self::convert_fixed_u128_to_balance(
                         trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
                 }
@@ -796,7 +762,7 @@ impl<T: Trait> Module<T> {
         }
 
         //TODO: This is going to be super duper expensive.
-        let mut modified_asks = binary_heap::BinaryHeap::from_vec_cmp(asks_sorted_vec,binary_heap::MinComparator);
+        let mut modified_asks = binary_heap::BinaryHeap::from_vec_cmp(asks_sorted_vec, binary_heap::MinComparator);
 
         if modified_asks.is_empty() && price_level_match == true {
             // There are no price levels available
