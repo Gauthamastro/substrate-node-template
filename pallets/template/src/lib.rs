@@ -10,7 +10,7 @@ use frame_support::traits::Get;
 use frame_system::ensure_signed;
 use pallet_generic_asset::AssetIdProvider;
 use sp_arithmetic::{FixedPointNumber, FixedU128};
-use sp_arithmetic::traits::{CheckedDiv, CheckedMul, CheckedSub, UniqueSaturatedFrom};
+use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, UniqueSaturatedFrom};
 use sp_std::collections::btree_map;
 use sp_std::collections::vec_deque::VecDeque;
 use sp_std::convert::TryInto;
@@ -326,6 +326,21 @@ impl<T: Trait> Module<T> {
                     None
                 }
             }
+            engine::OrderType::BidMarket => {
+                // There is no balance check available for BidMarket
+                // as Price is determined only during trade execution
+                let base_balance = pallet_generic_asset::Module::<T>::free_balance(&base_asset_id, &origin);
+                if let Some(base_balance_converted) = Self::convert_balance_to_fixed_u128(base_balance) {
+                    if base_balance_converted >= price {
+                        Some(order_book)
+                    } else {
+                        Self::deposit_event(RawEvent::InsufficientAssetBalance(balance_to_check));
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
             _ => {
                 None
             }
@@ -579,10 +594,131 @@ impl<T: Trait> Module<T> {
             }
             // Buy Market Order
             engine::OrderType::BidMarket => {
+                // In this case current_order.price stores the total amount in base-asset for which market order is executed.
+                // TODO: Take care of reserving and un-reserving of assets
+                let mut amount_filled = FixedU128::from(0);
+                let asks = order_book.get_asks_mut();
+                loop {
+                    if let Some(mut counter_price_level) = asks.pop() {
+                        // There are orders and counter_price_level matches asked_price_level
+                        let orders = counter_price_level.get_orders_mut();
+                        let mut matched = false;
+                        match current_order.get_price()
+                            .checked_div(counter_price_level.get_price_level()) {
+                            Some(amount) => {
+                                current_order.quantity = amount;
+                            }
+                            None => {
+                                // TODO: Return an error here
+                            }
+                        }
+                        for index in 0..orders.len() {
+                            if let Some(mut counter_order) = orders.remove(index) {
+                                let counter_quantity = counter_order.get_quantity();
+                                if counter_quantity > current_order.get_quantity() {
+                                    // partially execute counter order
+                                    amount_filled.checked_add(current_order.get_quantity());
+                                    counter_order = Self::partially_execute_order(counter_order,
+                                                                                  &current_order.clone(),
+                                                                                  trading_asset_id.clone(),
+                                                                                  base_asset_id.clone(),
+                                                                                  true);
+                                    // push front the remaining counter order
+                                    orders.push_front(counter_order);
+                                    matched = true;
+                                    break;
+                                } else if counter_quantity == current_order.get_quantity() {
+                                    // fully execute current order
+                                    // fully execute counter order
+                                    amount_filled.checked_add(current_order.get_quantity());
+                                    Self::fully_execute_order(counter_order,
+                                                              &current_order,
+                                                              trading_asset_id.clone(),
+                                                              base_asset_id.clone(),
+                                                              true);
+                                    // Remove both orders
+                                    matched = true;
+                                    break;
+                                } else {
+                                    // partially execute current order
+                                    amount_filled.checked_add(counter_order.get_quantity());
+                                    current_order = Self::partially_execute_order(current_order,
+                                                                                  &counter_order,
+                                                                                  trading_asset_id.clone(),
+                                                                                  base_asset_id.clone(),
+                                                                                  false);
+                                    // pop another order from queue or insert new bid in bids
+                                }
+                            }
+                        }
+                        if matched {
+                            // current order executed completely
+                            // save the state and exit
+                            // If there are orders left in this price level put it back in the BinaryHeap
+                            if !counter_price_level.get_orders().is_empty() {
+                                asks.push(counter_price_level);
+                            }
+                            break;
+                        }
+                    } else {
+                        // No price levels are available AskHeap is empty
+                        // TODO: Discard the order and return an Event
+                        break;
+                    }
+                }
+                // TODO: Emit Market Order Completion event using amount filled
                 order_book
             }
             // Sell Market Order
             engine::OrderType::AskMarket => {
+                // In this case current_order.quantity contains the market quantity that should be sold
+                let bids = order_book.get_bids_mut();
+                loop {
+                    if let Some(mut counter_price_level) = bids.pop() {
+                        // There are orders and counter_price_level matches asked_price_level
+                        let orders = counter_price_level.get_orders_mut();
+                        let mut matched = false;
+                        for index in 0..orders.len() {
+                            if let Some(mut counter_order) = orders.remove(index) {
+                                let counter_quantity = counter_order.get_quantity();
+                                if counter_quantity > current_order.get_quantity() {
+                                    // partially execute counter order
+                                    counter_order = Self::partially_execute_order(counter_order,
+                                                                                  &current_order,
+                                                                                  trading_asset_id.clone(),
+                                                                                  base_asset_id.clone(),
+                                                                                  true);
+                                    // push front the remaining counter order
+                                    orders.push_front(counter_order);
+                                    matched = true;
+                                    break;
+                                } else if counter_quantity == current_order.get_quantity() {
+                                    // fully execute current order
+                                    // fully execute counter order
+                                    Self::fully_execute_order(counter_order,
+                                                              &current_order,
+                                                              trading_asset_id.clone(),
+                                                              base_asset_id.clone(),
+                                                              true);
+                                    // Remove both orders
+                                    matched = true;
+                                    break;
+                                } else {
+                                    // partially execute current order
+                                    current_order = Self::partially_execute_order(current_order,
+                                                                                  &counter_order,
+                                                                                  trading_asset_id.clone(),
+                                                                                  base_asset_id.clone(),
+                                                                                  false);
+                                    // pop another order from queue or insert new bid in bids
+                                }
+                            }
+                        }
+                    } else {
+                        // There are not orders in the BidHeap
+                        // TODO: Emit event about it and exit
+                    }
+                }
                 order_book
             }
             // TODO:  Ignores other cases maybe should we generate an event for it?
@@ -606,8 +742,8 @@ impl<T: Trait> Module<T> {
                            trading_asset_id: T::AssetId,
                            base_asset_id: T::AssetId,
                            take_price_from_executing_order: bool) -> Order<T::AccountId, T::BlockNumber> {
-        return match executing_order.get_order_type() {
-            engine::OrderType::BidLimit | engine::OrderType::BidMarket => {
+        return match executing_order.get_order_type() { // TODO: Check this
+            engine::OrderType::BidLimit => {
                 // TODO: Remove the unwraps it can cause a panic
                 let trade_amount: T::Balance;
                 if take_price_from_executing_order {
@@ -644,7 +780,7 @@ impl<T: Trait> Module<T> {
                 // TODO: Deposit events for complete fill of trigger_order
                 executing_order
             }
-            engine::OrderType::AskLimit | engine::OrderType::AskMarket => {
+            engine::OrderType::AskLimit => {
                 let trade_amount: T::Balance;
                 // TODO: Take care of unwraps
                 if take_price_from_executing_order {
@@ -679,6 +815,51 @@ impl<T: Trait> Module<T> {
                 executing_order.set_quantity(executing_order.get_quantity().checked_sub(trigger_order.get_quantity()).unwrap());
                 // TODO: Deposit events for partial fill of executing_order
                 // TODO: Deposit events for complete fill of trigger_order
+                executing_order
+            }
+            engine::OrderType::BidMarket => {
+                let trade_amount: T::Balance;
+                if take_price_from_executing_order {
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                } else {
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                }
+                let trigger_quantity: T::Balance = Self::convert_fixed_u128_to_balance(*trigger_order.get_quantity()).unwrap();
+
+                // un-reserve price*quantity of base_asset from executing_order's origin is not needed as it is not reserved
+                // un-reserve quantity of trading_asset from trigger_order's origin
+                pallet_generic_asset::Module::<T>::unreserve(&trading_asset_id,
+                                                             trigger_order.get_origin(),
+                                                             trigger_quantity);
+                // TODO: Check the results for OK()
+                // Transfer price*quantity of base_asset from executing_order's origin to trigger_order's origin
+                let _result = pallet_generic_asset::Module::<T>::make_transfer(&base_asset_id,
+                                                                               executing_order.get_origin(),
+                                                                               trigger_order.get_origin(),
+                                                                               trade_amount);
+                // Transfer quantity of trading_asset from trigger_order's origin to executing_order's origin
+                let _result = pallet_generic_asset::Module::<T>::make_transfer(&trading_asset_id,
+                                                                               trigger_order.get_origin(),
+                                                                               executing_order.get_origin(),
+                                                                               trigger_quantity);
+
+                // TODO: Remove the unwraps it can cause a panic
+                executing_order.set_quantity(executing_order.get_quantity().checked_sub(trigger_order.get_quantity()).unwrap());
+                if take_price_from_executing_order {
+                    if executing_order.get_quantity() == &FixedU128::from(0) {
+                        // TODO: Deposit events for complete fill of executing_order
+                    } else {
+                        // TODO: Deposit events for partial fill of executing_order
+                    }
+                } else {
+                    // TODO: Deposit events for partial fill of trigger_order
+                }
+                executing_order
+            }
+            engine::OrderType::AskMarket => {
+                // TODO: Finish this
                 executing_order
             }
             _ => {
@@ -788,5 +969,16 @@ impl<T: Trait> Module<T> {
         // bids_mut = modified_bids;
         order_book.asks = modified_asks;
         order_book
+    }
+
+    pub fn calculate_trade_amount(price: &FixedU128, quantity: &FixedU128) -> T::Balance {
+        let trade_amount: T::Balance = Self::convert_fixed_u128_to_balance(
+            price.checked_mul(
+                quantity).unwrap()).unwrap(); // TODO: Take care of these unwraps
+        return trade_amount;
+    }
+
+    pub fn get_user_balance(who: &<T as frame_system::Trait>::AccountId, asset_id: T::AssetId) -> Option<FixedU128> {
+        Self::convert_balance_to_fixed_u128(pallet_generic_asset::Module::<T>::free_balance(asset_id, who))
     }
 }
