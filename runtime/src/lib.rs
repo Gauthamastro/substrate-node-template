@@ -412,10 +412,14 @@ impl pallet_generic_asset::Trait for Runtime {
 	type AssetId = u32;
 	type Event = Event;
 }
+parameter_types! {
+pub const OrderBookRegistrationFee: u128 = 1_000_000_000_000;
+}
 
 /// Configure the pallet template in pallets/template.
 impl template::Trait for Runtime {
 	type Event = Event;
+	type UNIT = OrderBookRegistrationFee;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
