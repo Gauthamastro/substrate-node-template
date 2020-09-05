@@ -309,7 +309,7 @@ impl<T: Trait> Module<T> {
                     None
                 }
             }
-            engine::OrderType::BidLimit | engine::OrderType::BidMarket => {
+            engine::OrderType::BidLimit => {
                 //  Check if price*quantity is available in the base_asset.
                 let base_balance = pallet_generic_asset::Module::<T>::free_balance(&base_asset_id, &origin);
                 if let Some(base_balance_converted) = Self::convert_balance_to_fixed_u128(base_balance) {
