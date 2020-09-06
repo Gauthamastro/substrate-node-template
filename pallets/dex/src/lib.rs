@@ -11,7 +11,7 @@ use frame_system::ensure_signed;
 use pallet_generic_asset::AssetIdProvider;
 use sp_api::decl_runtime_apis;
 use sp_arithmetic::{FixedPointNumber, FixedU128};
-use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Saturating, UniqueSaturatedFrom, SaturatedConversion};
+use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Saturating, UniqueSaturatedFrom};
 use sp_std::collections::btree_map;
 use sp_std::collections::vec_deque::VecDeque;
 use sp_std::convert::TryInto;
@@ -1136,7 +1136,7 @@ impl<T: Trait> Module<T> {
             market_data: Vec::with_capacity(10),
             enabled: true,
         };
-        /// Computing Asks Amount
+        // Computing Asks Amount
         let mut asks = order_book.asks;
         for _ in 0..10 {
             if let Some(price_level) = asks.pop() {
@@ -1154,7 +1154,7 @@ impl<T: Trait> Module<T> {
                 break;
             }
         }
-        /// Computing Bids Amount
+        // Computing Bids Amount
         let mut bids = order_book.bids;
         for _ in 0..10 {
             if let Some(price_level) = bids.pop() {

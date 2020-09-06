@@ -46,7 +46,7 @@ pub use frame_support::{
 	},
 };
 
-/// Import the template pallet.
+/// Import the dex pallet.
 pub use dex;
 
 /// An index to a block.
@@ -100,8 +100,8 @@ pub mod opaque {
 }
 
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
+	spec_name: create_runtime_str!("node-dex"),
+	impl_name: create_runtime_str!("node-dex"),
 	authoring_version: 1,
 	spec_version: 1,
 	impl_version: 1,
@@ -416,7 +416,7 @@ parameter_types! {
 pub const OrderBookRegistrationFee: u128 = 1_000_000_000_000;
 }
 
-/// Configure the pallet template in pallets/template.
+/// Configure the pallet dex in pallets/dex.
 impl dex::Trait for Runtime {
 	type Event = Event;
 	type UNIT = OrderBookRegistrationFee;
@@ -441,7 +441,7 @@ construct_runtime!(
 		Staking: pallet_staking::{Module, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Historical: pallet_session_historical::{Module},
-		// Include the custom logic from the template pallet in the runtime.
+		// Include the custom logic from the dex pallet in the runtime.
 		DEX: dex::{Module, Call, Storage, Event<T>},
 	}
 );

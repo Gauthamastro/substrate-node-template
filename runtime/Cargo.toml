@@ -200,7 +200,7 @@ version = '2.0.0-rc6'
 [dependencies.dex]
 default-features = false
 package = 'pallet-dex'
-path = '../pallets/template'
+path = '../pallets/dex'
 version = '2.0.0-rc6'
 
 [features]
