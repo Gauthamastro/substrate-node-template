@@ -50,8 +50,14 @@ decl_event!(
 	    CompleteFillSell(sp_std::vec::Vec<u8>,FixedU128),
 	    /// Partial Fill Sell Order [orderId,filled_amount]
 	    PartialFillSell(sp_std::vec::Vec<u8>,FixedU128),
+	    /// Complete Fill Buy Order [orderId,filled_amount]
+	    CompleteFillBuy(sp_std::vec::Vec<u8>,FixedU128),
+	    /// Partial Fill Buy Order [orderId,filled_amount]
+	    PartialFillBuy(sp_std::vec::Vec<u8>,FixedU128),
         /// Market Buy Completion [filled_amount]
         MarketBuy(FixedU128),
+        /// Market Sell Completion [filled_amount]
+        MarketSell(FixedU128),
 		/// Internal Error
 		InternalError,
         /// New order added to AsksHeap [price,quantity]
@@ -183,7 +189,7 @@ decl_module! {
 		/// Trading pair notation: trading_asset/base_asset ie (BTC/USDT)
 		/// Price is BTC/USDT and Quantity is BTC
 		#[weight = 10000]
-		pub fn submit_limit_order(origin,
+		pub fn submit_order(origin,
 		  order_type: engine::OrderType,
 		  order_id: sp_std::vec::Vec<u8>,
 		  price: FixedU128,
@@ -203,18 +209,6 @@ decl_module! {
 		        }
 		    }
 		Ok(Some(0).into())
-		}
-
-		// This function can be used to submit advanced orders
-		#[weight = 10000]
-		pub fn submit_advanced_order(origin,
-		  order_type: engine::OrderType,
-		  order_id: sp_std::vec::Vec<u8>,
-		  price: FixedU128,
-		  quantity: FixedU128 ) -> dispatch::DispatchResult{
-		let _trader = ensure_signed(origin)?;
-		// TODO: Do the order logic for the given advanced order.
-		Ok(())
 		}
 
 		// This function can be used to cancel orders
@@ -287,7 +281,7 @@ impl<T: Trait> Module<T> {
             Self::deposit_event(RawEvent::OrderTypeIsNone);
             return None;
         }
-        match order_type{
+        match order_type {
             engine::OrderType::AskLimit | engine::OrderType::BidLimit => {
                 if price <= FixedU128::from(0) || quantity <= FixedU128::from(0) {
                     Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
@@ -306,9 +300,7 @@ impl<T: Trait> Module<T> {
                     return None;
                 }
             }
-            _ => {
-
-            }
+            _ => {}
         }
         if !(<Books<T>>::contains_key(trading_pair)) {
             Self::deposit_event(RawEvent::TradingPairNotFound(trading_pair));
@@ -644,7 +636,7 @@ impl<T: Trait> Module<T> {
                             }
                             None => {
                                 Self::deposit_event(RawEvent::InternalError);
-                                return order_book
+                                return order_book;
                             }
                         }
                         for index in 0..orders.len() {
@@ -706,7 +698,7 @@ impl<T: Trait> Module<T> {
                     }
                 }
 
-                if amount_filled > FixedU128::from(0){
+                if amount_filled > FixedU128::from(0) {
                     Self::deposit_event(RawEvent::MarketBuy(amount_filled));
                 }
                 order_book
@@ -714,6 +706,7 @@ impl<T: Trait> Module<T> {
             // Sell Market Order
             engine::OrderType::AskMarket => {
                 // In this case current_order.quantity contains the market quantity that should be sold
+                let amount_filled = FixedU128::from(0);
                 let bids = order_book.get_bids_mut();
                 loop {
                     if let Some(mut counter_price_level) = bids.pop() {
@@ -725,6 +718,7 @@ impl<T: Trait> Module<T> {
                                 let counter_quantity = counter_order.get_quantity();
                                 if counter_quantity > current_order.get_quantity() {
                                     // partially execute counter order
+                                    amount_filled.checked_add(current_order.get_quantity());
                                     counter_order = Self::partially_execute_order(counter_order,
                                                                                   &current_order.clone(),
                                                                                   trading_asset_id.clone(),
@@ -738,6 +732,7 @@ impl<T: Trait> Module<T> {
                                 } else if counter_quantity == current_order.get_quantity() {
                                     // fully execute current order
                                     // fully execute counter order
+                                    amount_filled.checked_add(current_order.get_quantity());
                                     Self::fully_execute_order(counter_order,
                                                               &current_order,
                                                               trading_asset_id.clone(),
@@ -749,6 +744,7 @@ impl<T: Trait> Module<T> {
                                     break;
                                 } else {
                                     // partially execute current order
+                                    amount_filled.checked_add(counter_order.get_quantity());
                                     current_order = Self::partially_execute_order(current_order.clone(),
                                                                                   &counter_order,
                                                                                   trading_asset_id.clone(),
@@ -770,9 +766,13 @@ impl<T: Trait> Module<T> {
                         }
                     } else {
                         // There are not orders in the BidHeap
-                        // TODO: Emit event about it and exit
+                        Self::deposit_event(RawEvent::BidsHeapEmpty);
+                        Self::deposit_event(RawEvent::MarketSell(amount_filled));
                         break;
                     }
+                }
+                if amount_filled > FixedU128::from(0) {
+                    Self::deposit_event(RawEvent::MarketSell(amount_filled));
                 }
                 order_book
             }
@@ -789,8 +789,8 @@ impl<T: Trait> Module<T> {
                                trading_asset_id: T::AssetId,
                                base_asset_id: T::AssetId,
                                take_price_from_executing_order: bool,
-                                order_type: &engine::OrderType) -> Order<T::AccountId, T::BlockNumber> {
-        return Self::fully_execute_order(executing_order, trigger_order, trading_asset_id, base_asset_id, take_price_from_executing_order,order_type);
+                               order_type: &engine::OrderType) -> Order<T::AccountId, T::BlockNumber> {
+        return Self::fully_execute_order(executing_order, trigger_order, trading_asset_id, base_asset_id, take_price_from_executing_order, order_type);
     }
 
     fn fully_execute_order(mut executing_order: engine::Order<T::AccountId, T::BlockNumber>,
@@ -917,25 +917,83 @@ impl<T: Trait> Module<T> {
                     let order_id = executing_order.get_id();
                     if executing_order.get_quantity() == &FixedU128::from(0) {
                         // Deposit events for complete fill of Sell Limit
-                        Self::deposit_event(RawEvent::CompleteFillSell(order_id.clone(),*executing_order.get_quantity()));
+                        Self::deposit_event(RawEvent::CompleteFillSell(order_id.clone(), *executing_order.get_quantity()));
                     } else {
                         // Deposit events for partial fill of Sell Limit
-                        Self::deposit_event(RawEvent::PartialFillSell(order_id.clone(),*executing_order.get_quantity()));
+                        Self::deposit_event(RawEvent::PartialFillSell(order_id.clone(), *executing_order.get_quantity()));
                     }
                 } else {
                     let order_id = trigger_order.get_id();
                     if trigger_order.get_quantity() == &FixedU128::from(0) {
                         // Deposit events for complete fill of Sell Limit
-                        Self::deposit_event(RawEvent::CompleteFillSell(order_id.clone(),*trigger_order.get_quantity()));
+                        Self::deposit_event(RawEvent::CompleteFillSell(order_id.clone(), *trigger_order.get_quantity()));
                     } else {
                         // Deposit events for partial fill of Sell Limit
-                        Self::deposit_event(RawEvent::PartialFillSell(order_id.clone(),*trigger_order.get_quantity()));
+                        Self::deposit_event(RawEvent::PartialFillSell(order_id.clone(), *trigger_order.get_quantity()));
                     }
                 }
                 executing_order
             }
             engine::OrderType::AskMarket => {
-                // TODO: Finish this
+                let trade_quantity : T::Balance;
+                if take_price_from_executing_order {
+                    // here executing_order is counter_order (Bid Limit) and trigger_order is current_order (Market Sell)
+                    // When counterOrder.quantity >= currentOrder.quantity
+                    trade_quantity = Self::convert_fixed_u128_to_balance(trigger_order.get_quantity()).unwrap();
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                    pallet_generic_asset::Module::<T>::unreserve(&base_asset_id,
+                                                                 executing_order.get_origin(),
+                                                                 trade_amount);
+
+                    pallet_generic_asset::Module::<T>::make_transfer(&base_asset_id,
+                                                                     executing_order.get_origin(),
+                                                                     trigger_order.get_origin(),
+                                                                     trade_amount);
+                    pallet_generic_asset::Module::<T>::make_transfer(&trading_asset_id,
+                                                                     trigger_order.get_origin(),
+                                                                     executing_order.get_origin(),
+                                                                     trade_quantity);
+
+                } else {
+                    // here executing_order is current_order (Market Sell) and trigger_order is counter_order (Bid Limit)
+                    // When counterOrder.quantity < currentOrder.quantity
+                    trade_quantity = Self::convert_fixed_u128_to_balance(executing_order.get_quantity()).unwrap();
+                    trade_amount = Self::convert_fixed_u128_to_balance(
+                        trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
+                    pallet_generic_asset::Module::<T>::unreserve(&base_asset_id,
+                                                                 trigger_order.get_origin(),
+                                                                 trade_amount);
+
+                    pallet_generic_asset::Module::<T>::make_transfer(&base_asset_id,
+                                                                     trigger_order.get_origin(),
+                                                                     executing_order.get_origin(),
+                                                                     trade_amount);
+                    pallet_generic_asset::Module::<T>::make_transfer(&trading_asset_id,
+                                                                     executing_order.get_origin(),
+                                                                     trigger_order.get_origin(),
+                                                                     trade_quantity);
+                }
+                executing_order.set_quantity(executing_order.get_quantity().checked_sub(trigger_order.get_quantity()).unwrap());
+                if take_price_from_executing_order {
+                    let order_id = executing_order.get_id();
+                    if executing_order.get_quantity() == &FixedU128::from(0) {
+                        // Deposit events for complete fill of Buy Limit
+                        Self::deposit_event(RawEvent::CompleteFillBuy(order_id.clone(), *executing_order.get_quantity()));
+                    } else {
+                        // Deposit events for partial fill of Buy Limit
+                        Self::deposit_event(RawEvent::PartialFillBuy(order_id.clone(), *executing_order.get_quantity()));
+                    }
+                } else {
+                    let order_id = trigger_order.get_id();
+                    if trigger_order.get_quantity() == &FixedU128::from(0) {
+                        // Deposit events for complete fill of Buy Limit
+                        Self::deposit_event(RawEvent::CompleteFillBuy(order_id.clone(), *trigger_order.get_quantity()));
+                    } else {
+                        // Deposit events for partial fill of Buy Limit
+                        Self::deposit_event(RawEvent::PartialFillBuy(order_id.clone(), *trigger_order.get_quantity()));
+                    }
+                }
                 executing_order
             }
             _ => {
