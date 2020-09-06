@@ -191,9 +191,15 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
 
-[dependencies.template]
+[dependencies.sp-arithmetic]
 default-features = false
-package = 'pallet-template'
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc6'
+version = '2.0.0-rc6'
+
+[dependencies.dex]
+default-features = false
+package = 'pallet-dex'
 path = '../pallets/template'
 version = '2.0.0-rc6'
 
@@ -229,7 +235,7 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
-    'template/std',
+    'dex/std',
 ]
 
 [build-dependencies.wasm-builder-runner]

@@ -179,8 +179,6 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct MarketData<BlockNumber> {
     pub(crate) current_block: BlockNumber,
-    pub(crate) opening_bid: FixedU128,
-    pub(crate) opening_ask: FixedU128,
     pub(crate) closing_bid: FixedU128,
     pub(crate) closing_ask: FixedU128,
     pub(crate) volume: FixedU128,

@@ -47,7 +47,7 @@ pub use frame_support::{
 };
 
 /// Import the template pallet.
-pub use template;
+pub use dex;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -417,7 +417,7 @@ pub const OrderBookRegistrationFee: u128 = 1_000_000_000_000;
 }
 
 /// Configure the pallet template in pallets/template.
-impl template::Trait for Runtime {
+impl dex::Trait for Runtime {
 	type Event = Event;
 	type UNIT = OrderBookRegistrationFee;
 }
@@ -442,7 +442,7 @@ construct_runtime!(
 		Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
 		Historical: pallet_session_historical::{Module},
 		// Include the custom logic from the template pallet in the runtime.
-		TemplateModule: template::{Module, Call, Storage, Event<T>},
+		DEX: dex::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -645,6 +645,12 @@ impl_runtime_apis! {
 			len: u32,
 		) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
 			TransactionPayment::query_info(uxt, len)
+		}
+	}
+
+	impl dex::DexApi<Block> for Runtime {
+		fn get_order_book(trading_pair: u32) -> dex::apis::OrderBookApi{
+			DEX::get_order_book(trading_pair)
 		}
 	}
 }

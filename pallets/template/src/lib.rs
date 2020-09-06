@@ -9,8 +9,9 @@ use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
 use frame_support::traits::Get;
 use frame_system::ensure_signed;
 use pallet_generic_asset::AssetIdProvider;
+use sp_api::decl_runtime_apis;
 use sp_arithmetic::{FixedPointNumber, FixedU128};
-use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, UniqueSaturatedFrom};
+use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Saturating, UniqueSaturatedFrom, SaturatedConversion};
 use sp_std::collections::btree_map;
 use sp_std::collections::vec_deque::VecDeque;
 use sp_std::convert::TryInto;
@@ -27,6 +28,7 @@ mod mock;
 
 #[cfg(test)]
 mod tests;
+pub mod apis;
 
 /// Configure the pallet by specifying the parameters and types on which it depends.
 /// pallet_generic_asset::Trait bounds this DEX pallet with pallet_generic_asset. DEX is available
@@ -240,10 +242,9 @@ impl<T: Trait> Module<T> {
             advanced_ask_orders: binary_heap::BinaryHeap::new_min(),
             bids: binary_heap::BinaryHeap::new(),
             asks: binary_heap::BinaryHeap::new_min(),
+            // There should be only 28800 items or 1 day of blocks in this market_data vector
             market_data: sp_std::vec![engine::MarketData{
                 current_block:  current_block_num,
-                opening_bid: FixedU128::from(0),
-                opening_ask: FixedU128::from(0),
                 closing_bid: FixedU128::from(0),
                 closing_ask: FixedU128::from(0),
                 volume: FixedU128::from(0)
@@ -300,7 +301,9 @@ impl<T: Trait> Module<T> {
                     return None;
                 }
             }
-            _ => {}
+            _ => {
+                return None;
+            }
         }
         if !(<Books<T>>::contains_key(trading_pair)) {
             Self::deposit_event(RawEvent::TradingPairNotFound(trading_pair));
@@ -935,7 +938,7 @@ impl<T: Trait> Module<T> {
                 executing_order
             }
             engine::OrderType::AskMarket => {
-                let trade_quantity : T::Balance;
+                let trade_quantity: T::Balance;
                 if take_price_from_executing_order {
                     // here executing_order is counter_order (Bid Limit) and trigger_order is current_order (Market Sell)
                     // When counterOrder.quantity >= currentOrder.quantity
@@ -954,7 +957,6 @@ impl<T: Trait> Module<T> {
                                                                      trigger_order.get_origin(),
                                                                      executing_order.get_origin(),
                                                                      trade_quantity);
-
                 } else {
                     // here executing_order is current_order (Market Sell) and trigger_order is counter_order (Bid Limit)
                     // When counterOrder.quantity < currentOrder.quantity
@@ -1114,5 +1116,68 @@ impl<T: Trait> Module<T> {
 
     pub fn get_user_balance(who: &<T as frame_system::Trait>::AccountId, asset_id: T::AssetId) -> Option<FixedU128> {
         Self::convert_balance_to_fixed_u128(pallet_generic_asset::Module::<T>::free_balance(&asset_id, who))
+    }
+
+    pub fn get_order_book(trading_pair: u32) -> apis::OrderBookApi{
+        if !(<Books<T>>::contains_key(trading_pair)) {
+            let order_book_data = apis::OrderBookApi {
+                bids: Vec::with_capacity(0),
+                asks: Vec::with_capacity(0),
+                market_data: Vec::with_capacity(0),
+                enabled: false,
+            };
+            return order_book_data;
+        }
+        let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
+
+        let mut order_book_data = apis::OrderBookApi {
+            bids: Vec::with_capacity(10),
+            asks: Vec::with_capacity(10),
+            market_data: Vec::with_capacity(10),
+            enabled: true,
+        };
+        /// Computing Asks Amount
+        let mut asks = order_book.asks;
+        for _ in 0..10 {
+            if let Some(price_level) = asks.pop() {
+                let mut quantity = FixedU128::from(0);
+                let orders: Vec<&Order<T::AccountId, T::BlockNumber>> = price_level.get_orders().iter().collect();
+                for order in orders {
+                    quantity = quantity.saturating_add(order.quantity)
+                }
+                let new_price_level = apis::PriceLevelData {
+                    price_level: *price_level.get_price_level(),
+                    amount: quantity,
+                };
+                order_book_data.asks.push(new_price_level);
+            } else {
+                break;
+            }
+        }
+        /// Computing Bids Amount
+        let mut bids = order_book.bids;
+        for _ in 0..10 {
+            if let Some(price_level) = bids.pop() {
+                let mut quantity = FixedU128::from(0);
+                let orders: Vec<&Order<T::AccountId, T::BlockNumber>> = price_level.get_orders().iter().collect();
+                for order in orders {
+                    quantity = quantity.saturating_add(order.quantity)
+                }
+                let new_price_level = apis::PriceLevelData {
+                    price_level: *price_level.get_price_level(),
+                    amount: quantity,
+                };
+                order_book_data.bids.push(new_price_level);
+            } else {
+                break;
+            }
+        }
+        return order_book_data;
+    }
+}
+
+decl_runtime_apis! {
+    pub trait DexApi {
+    fn get_order_book(trading_pair: u32) ->  apis::OrderBookApi;
     }
 }

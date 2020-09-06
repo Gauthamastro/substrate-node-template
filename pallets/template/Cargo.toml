@@ -1,10 +1,10 @@
 [package]
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-description = 'FRAME pallet template for defining custom runtime logic.'
+description = 'FRAME pallet for decentralized exchange.'
 edition = '2018'
 homepage = 'https://substrate.dev'
 license = 'Unlicense'
-name = 'pallet-template'
+name = 'pallet-dex'
 repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 version = '2.0.0-rc6'
 
@@ -21,9 +21,6 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 #tag = "v0.3.0"
 #binary-heap-plus = { git = "https://github.com/sekineh/binary-heap-plus-rs", tag = "v0.3.0" }
 
-[dependencies.substrate-fixed]
-git = 'https://github.com/encointer/substrate-fixed.git'
-tag = "v0.5.4+sub_v0.1"
 
 [dependencies.sp-arithmetic]
 default-features = false
@@ -32,6 +29,12 @@ tag = 'v2.0.0-rc6'
 version = '2.0.0-rc6'
 
 [dependencies.sp-std]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc6'
+version = '2.0.0-rc6'
+
+[dependencies.sp-api]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc6'

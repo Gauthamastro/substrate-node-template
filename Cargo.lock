@@ -3316,6 +3316,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "pallet-babe",
  "pallet-balances",
+ "pallet-dex",
  "pallet-generic-asset",
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
@@ -3323,13 +3324,13 @@ dependencies = [
  "pallet-staking",
  "pallet-staking-reward-curve",
  "pallet-sudo",
- "pallet-template",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "parity-scale-codec",
  "serde",
  "sp-api",
+ "sp-arithmetic",
  "sp-block-builder",
  "sp-consensus-babe",
  "sp-core",
@@ -3546,6 +3547,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dex"
+version = "2.0.0-rc6"
+dependencies = [
+ "compare",
+ "frame-support",
+ "frame-system",
+ "pallet-generic-asset",
+ "parity-scale-codec",
+ "serde",
+ "sp-api",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-finality-tracker"
 version = "2.0.0-rc6"
 source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc6#be8bb186d87b9d2b47a2907c9b51ae1e252362c3"
@@ -3672,24 +3691,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
-]
-
-[[package]]
-name = "pallet-template"
-version = "2.0.0-rc6"
-dependencies = [
- "compare",
- "frame-support",
- "frame-system",
- "pallet-generic-asset",
- "parity-scale-codec",
- "serde",
- "sp-arithmetic",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
- "substrate-fixed",
 ]
 
 [[package]]
@@ -6661,15 +6662,6 @@ version = "2.0.0-rc6"
 source = "git+https://github.com/paritytech/substrate.git?tag=v2.0.0-rc6#be8bb186d87b9d2b47a2907c9b51ae1e252362c3"
 dependencies = [
  "platforms",
-]
-
-[[package]]
-name = "substrate-fixed"
-version = "0.5.4"
-source = "git+https://github.com/encointer/substrate-fixed.git?tag=v0.5.4+sub_v0.1#2c52170fa02507dc5b52c516061302670860869a"
-dependencies = [
- "parity-scale-codec",
- "typenum",
 ]
 
 [[package]]
