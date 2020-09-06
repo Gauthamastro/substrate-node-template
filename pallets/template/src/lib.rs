@@ -44,6 +44,8 @@ decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId,
 	 Balance = <T as pallet_generic_asset::Trait>::Balance,
 	  BlockNumber = <T as frame_system::Trait>::BlockNumber{
+	    /// Calculated Market Order Quantity
+	    CalculatedOrderAmount(FixedU128),
 	    /// Complete Fill Sell Order [orderId,filled_amount]
 	    CompleteFillSell(sp_std::vec::Vec<u8>,FixedU128),
 	    /// Partial Fill Sell Order [orderId,filled_amount]
@@ -281,13 +283,32 @@ impl<T: Trait> Module<T> {
     fn basic_order_checks(origin: &<T as frame_system::Trait>::AccountId, trading_pair: u32,
                           price: FixedU128, quantity: FixedU128, order_type: engine::OrderType,
                           order_id: sp_std::vec::Vec<u8>) -> Option<engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>> {
-        if price <= FixedU128::from(0) && quantity <= FixedU128::from(0) {
-            Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
-            return None;
-        }
         if order_type == engine::OrderType::None {
             Self::deposit_event(RawEvent::OrderTypeIsNone);
             return None;
+        }
+        match order_type{
+            engine::OrderType::AskLimit | engine::OrderType::BidLimit => {
+                if price <= FixedU128::from(0) || quantity <= FixedU128::from(0) {
+                    Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
+                    return None;
+                }
+            }
+            engine::OrderType::BidMarket => {
+                if price <= FixedU128::from(0) {
+                    Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
+                    return None;
+                }
+            }
+            engine::OrderType::AskMarket => {
+                if quantity <= FixedU128::from(0) {
+                    Self::deposit_event(RawEvent::PriceOrQuanitityIsZero);
+                    return None;
+                }
+            }
+            _ => {
+
+            }
         }
         if !(<Books<T>>::contains_key(trading_pair)) {
             Self::deposit_event(RawEvent::TradingPairNotFound(trading_pair));
@@ -619,6 +640,7 @@ impl<T: Trait> Module<T> {
                             .checked_div(&counter_price) {
                             Some(amount) => {
                                 current_order.quantity = amount;
+                                Self::deposit_event(RawEvent::CalculatedOrderAmount(amount));
                             }
                             None => {
                                 Self::deposit_event(RawEvent::InternalError);
