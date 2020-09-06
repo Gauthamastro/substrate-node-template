@@ -701,9 +701,11 @@ impl<T: Trait> Module<T> {
                     } else {
                         // No price levels are available AskHeap is empty
                         Self::deposit_event(RawEvent::AsksHeapEmpty);
+                        Self::deposit_event(RawEvent::MarketBuy(amount_filled));
                         return order_book;
                     }
                 }
+
                 if amount_filled > FixedU128::from(0){
                     Self::deposit_event(RawEvent::MarketBuy(amount_filled));
                 }

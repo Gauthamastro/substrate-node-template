@@ -12,19 +12,19 @@ pub type TradingPair = u32;
 pub enum OrderType {
     BidLimit,
     BidMarket,
-    BidStopLimit,
-    BidStopMarket,
-    BidStopLoss,
-    BidFillKill,
+    // BidStopLimit,
+    // BidStopMarket,
+    // BidStopLoss,
+    // BidFillKill,
 
-    PostOnly,
+    // PostOnly,
 
     AskLimit,
     AskMarket,
-    AskStopLimit,
-    AskStopMarket,
-    AskStopLoss,
-    AskFillKill,
+    // AskStopLimit,
+    // AskStopMarket,
+    // AskStopLoss,
+    // AskFillKill,
 
     None,
 }
