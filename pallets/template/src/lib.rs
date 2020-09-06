@@ -939,8 +939,8 @@ impl<T: Trait> Module<T> {
                 if take_price_from_executing_order {
                     // here executing_order is counter_order (Bid Limit) and trigger_order is current_order (Market Sell)
                     // When counterOrder.quantity >= currentOrder.quantity
-                    trade_quantity = Self::convert_fixed_u128_to_balance(trigger_order.get_quantity()).unwrap();
-                    trade_amount = Self::convert_fixed_u128_to_balance(
+                    trade_quantity = Self::convert_fixed_u128_to_balance(*trigger_order.get_quantity()).unwrap();
+                    let trade_amount = Self::convert_fixed_u128_to_balance(
                         executing_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
                     pallet_generic_asset::Module::<T>::unreserve(&base_asset_id,
                                                                  executing_order.get_origin(),
@@ -958,8 +958,8 @@ impl<T: Trait> Module<T> {
                 } else {
                     // here executing_order is current_order (Market Sell) and trigger_order is counter_order (Bid Limit)
                     // When counterOrder.quantity < currentOrder.quantity
-                    trade_quantity = Self::convert_fixed_u128_to_balance(executing_order.get_quantity()).unwrap();
-                    trade_amount = Self::convert_fixed_u128_to_balance(
+                    trade_quantity = Self::convert_fixed_u128_to_balance(*executing_order.get_quantity()).unwrap();
+                    let trade_amount = Self::convert_fixed_u128_to_balance(
                         trigger_order.get_price().checked_mul(trigger_order.get_quantity()).unwrap()).unwrap();
                     pallet_generic_asset::Module::<T>::unreserve(&base_asset_id,
                                                                  trigger_order.get_origin(),
