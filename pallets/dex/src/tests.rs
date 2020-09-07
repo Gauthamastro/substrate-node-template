@@ -6,9 +6,9 @@ use sp_arithmetic::traits::{CheckedDiv, UniqueSaturatedFrom};
 #[test]
 fn balance_fixed_u128_integer_conversion_works() {
     let value = FixedU128::from(2);
-    let balance_converted = TemplateModule::convert_fixed_u128_to_balance(value);
+    let balance_converted = DEXModule::convert_fixed_u128_to_balance(value);
     assert!(balance_converted.is_some());
-    let balance: Option<FixedU128> = TemplateModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
+    let balance: Option<FixedU128> = DEXModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
     assert!(balance.is_some());
     assert_eq!(balance, Some(value));
 }
@@ -16,33 +16,61 @@ fn balance_fixed_u128_integer_conversion_works() {
 #[test]
 fn balance_fixed_u128_float_conversion_works() {
     let value = FixedU128::from_fraction(2.3456789);
-    let balance_converted = TemplateModule::convert_fixed_u128_to_balance(value);
+    let balance_converted = DEXModule::convert_fixed_u128_to_balance(value);
     assert!(balance_converted.is_some());
-    let balance: Option<FixedU128> = TemplateModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
+    let balance: Option<FixedU128> = DEXModule::convert_balance_to_fixed_u128(balance_converted.unwrap());
     assert!(balance.is_some());
     assert_eq!(balance, Some(value));
 }
 
 #[test]
-fn it_works_for_default_value() {
+fn dex_test_bid_limit() {
     new_test_ext().execute_with(|| {
-        // Dispatch a signed extrinsic.
-        // assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
-        // // Read pallet storage and assert an expected result.
-        // assert_eq!(TemplateModule::something(), Some(42));
+        let btcholder: u64 = 0;
+        let usdtholder: u64 = 1;
+        let btc: u32 = 0;
+        let usdt: u32 = 1;
+
+        initialize_balances();
+
+
     });
+}
+fn initialize_balances(){
+    let btcholder: u64 = 0;
+    let usdtholder: u64 = 1;
+    let btc: u32 = 0;
+    let usdt: u32 = 1;
+
+    const UNIT: u128 = 1_000_000_000_000;
+    // Genesis Setup
+    assert_ok!(pallet_generic_asset::Module::<Test>::create_asset(None,
+                                                           Some(btcholder),
+                                                           pallet_generic_asset::AssetOptions{
+                                                               initial_issuance:3*UNIT, permissions: Default::default() }));
+    assert_eq!(pallet_generic_asset::Module::<Test>::free_balance(
+        &btc, &btcholder), 3*UNIT);
+    assert_ok!(pallet_generic_asset::Module::<Test>::create_asset(None,
+                                                           Some(usdtholder),
+                                                           pallet_generic_asset::AssetOptions{
+                                                               initial_issuance:3*UNIT, permissions: Default::default() }));
+    assert_eq!(pallet_generic_asset::Module::<Test>::free_balance(
+        &usdt, &usdtholder), 3*UNIT);
+
+    assert_ok!(DEXModule::register_new_orderbook(Origin::signed(btcholder),btc,usdt));
+    // Genesis Setup Finished.
 }
 
-#[test]
-fn correct_error_for_none_value() {
-    new_test_ext().execute_with(|| {
-        // // Ensure the expected error is thrown when no value is present.
-        // assert_noop!(
-        // 	TemplateModule::cause_error(Origin::signed(1)),
-        // 	Error::<Test>::NoneValue
-        // );
-    });
-}
+// #[test]
+// fn correct_error_for_none_value() {
+//     new_test_ext().execute_with(|| {
+//         // // Ensure the expected error is thrown when no value is present.
+//         // assert_noop!(
+//         // 	TemplateModule::cause_error(Origin::signed(1)),
+//         // 	Error::<Test>::NoneValue
+//         // );
+//     });
+// }
 
 #[cfg(test)]
 mod from_liballoc {
@@ -50,9 +78,6 @@ mod from_liballoc {
     use crate::binary_heap::*;
     use sp_std::vec;
     use sp_std::vec::Vec;
-    // use std::panic;
-    // use std::collections::BinaryHeap;
-    // use std::collections::binary_heap::{Drain, PeekMut};
 
     #[test]
     fn test_iterator() {

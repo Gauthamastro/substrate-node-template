@@ -49,16 +49,20 @@ impl system::Trait for Test {
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
 }
+parameter_types! {
+pub const OrderBookRegistrationFee: u128 = 1_000_000_000_000;
+}
 
 impl Trait for Test {
 	type Event = ();
+	type UNIT = OrderBookRegistrationFee;
 }
 impl pallet_generic_asset::Trait for Test{
 	type Balance = u128;
 	type AssetId = u32;
 	type Event = ();
 }
-pub type TemplateModule = Module<Test>;
+pub type DEXModule = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {

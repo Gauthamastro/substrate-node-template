@@ -1,6 +1,7 @@
 use sp_arithmetic::FixedU128;
 use sp_std::vec::Vec;
 use codec::{Encode, Decode};
+
 #[derive(Encode, Decode, PartialEq)]
 pub struct MarketData {
     current_block_num: u64,

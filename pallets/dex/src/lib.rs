@@ -168,7 +168,7 @@ decl_module! {
 		// The origin should have a non-zero balance in both assets
 		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(trading_asset_id), &_trader);
 		let base_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(base_asset_id), &_trader);
-		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) && (TryInto::<u128>::try_into(base_asset_balance).ok().unwrap()>0){
+		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) || (TryInto::<u128>::try_into(base_asset_balance).ok().unwrap()>0){
 		// The origin should reserve a certain amount of SpendingAssetCurrency for registering the pair
 
 		if Self::reserve_balance_registration(&_trader){

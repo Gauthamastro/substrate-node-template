@@ -193,7 +193,7 @@ use sp_std::vec::Vec;
 /// # Examples
 ///
 /// ```
-/// use pallet_template::binary_heap::BinaryHeap;
+/// use pallet_dex::binary_heap::BinaryHeap;
 /// // Type inference lets us omit an explicit type signature (which
 /// // would be `BinaryHeap<i32, MaxComparator>` in this example).
 /// let mut heap = BinaryHeap::new();
@@ -416,7 +416,7 @@ impl<T: Ord> BinaryHeap<T> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// heap.push(3);
     /// heap.push(1);
@@ -440,7 +440,7 @@ impl<T: Ord> BinaryHeap<T> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::with_capacity(10);
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -464,7 +464,7 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new_min();
     /// heap.push(3);
     /// heap.push(1);
@@ -487,7 +487,7 @@ impl<T: Ord> BinaryHeap<T, MinComparator> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::with_capacity_min(10);
     /// assert_eq!(heap.capacity(), 10);
     /// heap.push(3);
@@ -607,7 +607,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4]);
     ///
     /// // Print 1, 2, 3, 4 in arbitrary order
@@ -630,7 +630,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4, 5]);
     ///
     /// assert_eq!(heap.into_iter_sorted().take(2).collect::<Vec<_>>(), vec![5, 4]);
@@ -649,7 +649,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// assert_eq!(heap.peek(), None);
     ///
@@ -675,7 +675,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// assert!(heap.peek_mut().is_none());
     ///
@@ -707,7 +707,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::with_capacity(100);
     /// assert!(heap.capacity() >= 100);
     /// heap.push(4);
@@ -733,7 +733,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// heap.reserve_exact(100);
     /// assert!(heap.capacity() >= 100);
@@ -758,7 +758,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// heap.reserve(100);
     /// assert!(heap.capacity() >= 100);
@@ -776,7 +776,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap: BinaryHeap<i32> = BinaryHeap::with_capacity(100);
     ///
     /// assert!(heap.capacity() >= 100);
@@ -796,7 +796,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert_eq!(heap.pop(), Some(3));
@@ -821,7 +821,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     /// heap.push(3);
     /// heap.push(5);
@@ -845,7 +845,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4, 5, 6, 7]);
     /// let vec = heap.into_vec();
     ///
@@ -867,7 +867,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     ///
     /// let mut heap = BinaryHeap::from(vec![1, 2, 4, 5, 7]);
     /// heap.push(6);
@@ -978,7 +978,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert_eq!(heap.len(), 2);
@@ -995,7 +995,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::new();
     ///
     /// assert!(heap.is_empty());
@@ -1020,7 +1020,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert!(!heap.is_empty());
@@ -1046,7 +1046,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     /// let mut heap = BinaryHeap::from(vec![1, 3]);
     ///
     /// assert!(!heap.is_empty());
@@ -1075,7 +1075,7 @@ impl<T, C: Compare<T>> BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    ///use pallet_template::binary_heap::BinaryHeap;
+    ///use pallet_dex::binary_heap::BinaryHeap;
     ///
     /// let v = vec![-10, 1, 2, 3, 3];
     /// let mut a = BinaryHeap::from(v);
@@ -1421,7 +1421,7 @@ impl<T, C: Compare<T>> IntoIterator for BinaryHeap<T, C> {
     /// Basic usage:
     ///
     /// ```
-    /// use pallet_template::binary_heap::BinaryHeap;
+    /// use pallet_dex::binary_heap::BinaryHeap;
     ///
     /// let heap = BinaryHeap::from(vec![1, 2, 3, 4]);
     ///
