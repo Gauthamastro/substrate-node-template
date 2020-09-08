@@ -97,7 +97,7 @@ fn dex_test_same_price_level_two_asks_and_same_price_level_bigger_bid() {
         let mut order_book: engine::OrderBook<u64,u64,u32>;
         initialize_balances();
 
-        // Submit Bid Orders
+        // Submit Ask Orders
         assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
                                 engine::OrderType::AskLimit,
                                 sp_std::vec::Vec::new(),
@@ -148,9 +148,50 @@ fn dex_test_same_price_level_two_asks_and_same_price_level_bigger_bid() {
             panic!("Bids should not be empty")
         }
 
+    });
+}
+
+#[test]
+fn test_market_buy_same_price_level(){
+    new_test_ext().execute_with(|| {
+        let btcholder: u64 = 0;
+        let usdtholder: u64 = 1;
+        let btc: u32 = 0;
+        let usdt: u32 = 1;
+        let mut order_book: engine::OrderBook<u64, u64, u32>;
+        initialize_balances();
+
+        // Submit Ask Orders
+        assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
+                                engine::OrderType::AskLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(0.7),0));
+        assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
+                                engine::OrderType::AskLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(1.0),0));
+
+        // Check whether the order of asks is correct
+        order_book = DEXModule::get_order_book_testing(0);
+        assert!(&order_book.clone().get_asks().peek().is_some()); // Shows that ask orders are there
+        if let Some(ask) = order_book.clone().get_asks().peek() {
+            assert_eq!(ask.get_price_level(), &FixedU128::from_fraction(1.0));
+            if let Some(order) = ask.get_orders().into_iter().next() {
+                assert_eq!(order.get_quantity(), &FixedU128::from_fraction(0.7), "The first ask Order Quantity to process");
+            } else {
+                panic!("Ask Order should be present in this price level")
+            }
+        } else {
+            panic!("Asks should not be empty")
+        }
+
+
 
     });
 }
+
 
 
 /// Initializes the balances in generic asset pallet for testing
