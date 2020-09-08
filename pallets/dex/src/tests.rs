@@ -1,7 +1,7 @@
-use crate::{Error, mock::*, Trait};
-use frame_support::{assert_ok, assert_noop};
-use sp_arithmetic::{FixedU128, FixedPointNumber};
-use sp_arithmetic::traits::{CheckedDiv, UniqueSaturatedFrom};
+use frame_support::assert_ok;
+use sp_arithmetic::FixedU128;
+
+use crate::{engine, Error, mock::*, Trait, mock};
 
 #[test]
 fn balance_fixed_u128_integer_conversion_works() {
@@ -24,23 +24,141 @@ fn balance_fixed_u128_float_conversion_works() {
 }
 
 #[test]
-fn dex_test_bid_limit() {
+fn dex_test_same_price_level_two_bids_and_same_price_level_bigger_ask() {
     new_test_ext().execute_with(|| {
         let btcholder: u64 = 0;
         let usdtholder: u64 = 1;
         let btc: u32 = 0;
         let usdt: u32 = 1;
-
+        let mut order_book: engine::OrderBook<u64,u64,u32>;
         initialize_balances();
+
+        // Submit Bid Orders
+        assert_ok!(DEXModule::submit_order(Origin::signed(usdtholder),
+                                engine::OrderType::BidLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(0.7),0));
+        assert_ok!(DEXModule::submit_order(Origin::signed(usdtholder),
+                                engine::OrderType::BidLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(1.0),0));
+
+        // Check whether the order of bids are correct
+        order_book = DEXModule::get_order_book_testing(0);
+        assert!(&order_book.clone().get_bids().peek().is_some()); // Shows that ask orders are there
+        if let Some(bid) = order_book.clone().get_bids().peek(){
+            assert_eq!(bid.get_price_level(),&FixedU128::from_fraction(1.0));
+            if let Some(order) = bid.get_orders().into_iter().next(){
+                assert_eq!(order.get_quantity(),&FixedU128::from_fraction(0.7),"The first bid Order Quantity to process");
+            }else{
+                panic!("Bid Order should be present in this price level")
+            }
+
+        }else{
+            panic!("Bids should not be empty")
+        }
+
+        // Submit the Ask Order
+        assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
+                                engine::OrderType::AskLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(2.0),0));
+
+        // Check the orderbook state
+        order_book = DEXModule::get_order_book_testing(0);
+        assert_eq!(order_book.clone().get_bids().peek(), None);
+
+        assert!(&order_book.clone().get_asks().peek().is_some()); // Shows that ask orders are there
+        if let Some(ask) = order_book.clone().get_asks().peek(){
+            assert_eq!(ask.get_price_level(),&FixedU128::from_fraction(1.0));
+            if let Some(order) = ask.get_orders().into_iter().next(){
+                assert_eq!(order.get_quantity(),&FixedU128::from_fraction(0.3),"The remaining sell order quantity");
+            }else{
+                panic!("Sell Order should be present in this price level")
+            }
+
+        }else{
+            panic!("Asks should not be empty")
+        }
+
+    });
+}
+
+#[test]
+fn dex_test_same_price_level_two_asks_and_same_price_level_bigger_bid() {
+    new_test_ext().execute_with(|| {
+        let btcholder: u64 = 0;
+        let usdtholder: u64 = 1;
+        let btc: u32 = 0;
+        let usdt: u32 = 1;
+        let mut order_book: engine::OrderBook<u64,u64,u32>;
+        initialize_balances();
+
+        // Submit Bid Orders
+        assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
+                                engine::OrderType::AskLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(0.7),0));
+        assert_ok!(DEXModule::submit_order(Origin::signed(btcholder),
+                                engine::OrderType::AskLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(1.0),0));
+
+        // Check whether the order of asks is correct
+        order_book = DEXModule::get_order_book_testing(0);
+        assert!(&order_book.clone().get_asks().peek().is_some()); // Shows that ask orders are there
+        if let Some(ask) = order_book.clone().get_asks().peek(){
+            assert_eq!(ask.get_price_level(),&FixedU128::from_fraction(1.0));
+            if let Some(order) = ask.get_orders().into_iter().next(){
+                assert_eq!(order.get_quantity(),&FixedU128::from_fraction(0.7),"The first ask Order Quantity to process");
+            }else{
+                panic!("Ask Order should be present in this price level")
+            }
+
+        }else{
+            panic!("Asks should not be empty")
+        }
+
+        // Submit the Bid Order
+        assert_ok!(DEXModule::submit_order(Origin::signed(usdtholder),
+                                engine::OrderType::BidLimit,
+                                sp_std::vec::Vec::new(),
+                                FixedU128::from_fraction(1.0),
+                                FixedU128::from_fraction(2.0),0));
+
+        // Check the orderbook state
+        order_book = DEXModule::get_order_book_testing(0);
+        assert_eq!(order_book.clone().get_asks().peek(), None);
+
+        assert!(&order_book.clone().get_bids().peek().is_some()); // Shows that bid orders are there
+        if let Some(bid) = order_book.clone().get_bids().peek(){
+            assert_eq!(bid.get_price_level(),&FixedU128::from_fraction(1.0));
+            if let Some(order) = bid.get_orders().into_iter().next(){
+                assert_eq!(order.get_quantity(),&FixedU128::from_fraction(0.3),"The remaining bids order quantity");
+            }else{
+                panic!("Bid Order should be present in this price level")
+            }
+
+        }else{
+            panic!("Bids should not be empty")
+        }
 
 
     });
 }
-fn initialize_balances(){
+
+
+/// Initializes the balances in generic asset pallet for testing
+fn initialize_balances() {
     let btcholder: u64 = 0;
     let usdtholder: u64 = 1;
-    let btc: u32 = 0;
-    let usdt: u32 = 1;
+    let btc: u32 = 0; // 3 units
+    let usdt: u32 = 1; // 3 units
 
     const UNIT: u128 = 1_000_000_000_000;
     // Genesis Setup
@@ -49,13 +167,13 @@ fn initialize_balances(){
                                                            pallet_generic_asset::AssetOptions{
                                                                initial_issuance:3*UNIT, permissions: Default::default() }));
     assert_eq!(pallet_generic_asset::Module::<Test>::free_balance(
-        &btc, &btcholder), 3*UNIT);
+        &btc, &btcholder), 3 * UNIT);
     assert_ok!(pallet_generic_asset::Module::<Test>::create_asset(None,
                                                            Some(usdtholder),
                                                            pallet_generic_asset::AssetOptions{
                                                                initial_issuance:3*UNIT, permissions: Default::default() }));
     assert_eq!(pallet_generic_asset::Module::<Test>::free_balance(
-        &usdt, &usdtholder), 3*UNIT);
+        &usdt, &usdtholder), 3 * UNIT);
 
     assert_ok!(DEXModule::register_new_orderbook(Origin::signed(btcholder),btc,usdt));
     // Genesis Setup Finished.
@@ -74,10 +192,11 @@ fn initialize_balances(){
 
 #[cfg(test)]
 mod from_liballoc {
-    // The following tests copyed from liballoc/tests/binary_heap.rs
-    use crate::binary_heap::*;
     use sp_std::vec;
     use sp_std::vec::Vec;
+
+    // The following tests copyed from liballoc/tests/binary_heap.rs
+    use crate::binary_heap::*;
 
     #[test]
     fn test_iterator() {
@@ -384,8 +503,9 @@ mod from_liballoc {
 #[cfg(feature = "serde")]
 #[cfg(test)]
 mod tests_serde {
-    use crate::binary_heap::*;
     use serde_json;
+
+    use crate::binary_heap::*;
 
     #[test]
     fn deserialized_same_small_vec() {

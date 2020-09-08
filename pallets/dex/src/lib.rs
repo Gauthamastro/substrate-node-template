@@ -371,7 +371,7 @@ impl<T: Trait> Module<T> {
     /// Checks if the given order id exists in the given orderbook
     fn check_order_id(orders: &btree_map::BTreeMap<Vec<u8>, engine::Order<T::AccountId, T::BlockNumber>>
                       , order_id: sp_std::vec::Vec<u8>) -> bool {
-        if orders.contains_key(&order_id) {
+        if orders.contains_key(&order_id) { // TODO: This check is not working, do something better!!!
             Self::deposit_event(RawEvent::DuplicateOrderId(order_id));
             false
         } else {
@@ -455,45 +455,45 @@ impl<T: Trait> Module<T> {
                                 // There are orders and counter_price_level matches asked_price_level
                                 let orders = counter_price_level.get_orders_mut();
                                 let mut matched = false;
-                                for index in 0..orders.len() {
-                                    if let Some(mut counter_order) = orders.remove(index) {
-                                        let counter_quantity = counter_order.get_quantity();
-                                        if counter_quantity > current_order.get_quantity() {
-                                            // partially execute counter order
-                                            counter_order = Self::partially_execute_order(counter_order,
-                                                                                          &current_order.clone(),
-                                                                                          trading_asset_id.clone(),
-                                                                                          base_asset_id.clone(),
-                                                                                          false,
-                                                                                          &current_order.get_order_type());
-                                            // push front the remaining counter order
-                                            orders.push_front(counter_order);
-                                            matched = true;
-                                            break;
-                                        } else if counter_quantity == current_order.get_quantity() {
-                                            // fully execute current order
-                                            // fully execute counter order
-                                            Self::fully_execute_order(counter_order,
-                                                                      &current_order.clone(),
-                                                                      trading_asset_id.clone(),
-                                                                      base_asset_id.clone(),
-                                                                      false,
-                                                                      &current_order.get_order_type());
-                                            // Remove both orders
-                                            matched = true;
-                                            break;
-                                        } else {
-                                            // partially execute current order
-                                            current_order = Self::partially_execute_order(current_order.clone(),
-                                                                                          &counter_order,
-                                                                                          trading_asset_id.clone(),
-                                                                                          base_asset_id.clone(),
-                                                                                          true,
-                                                                                          &current_order.get_order_type());
-                                            // pop another order from queue or insert new bid in bids
-                                        }
+
+                                while let Some(mut counter_order) = orders.pop_front() {
+                                    let counter_quantity = counter_order.get_quantity();
+                                    if counter_quantity > current_order.get_quantity() {
+                                        // partially execute counter order
+                                        counter_order = Self::partially_execute_order(counter_order,
+                                                                                      &current_order.clone(),
+                                                                                      trading_asset_id.clone(),
+                                                                                      base_asset_id.clone(),
+                                                                                      false,
+                                                                                      &current_order.get_order_type());
+                                        // push front the remaining counter order
+                                        orders.push_front(counter_order);
+                                        matched = true;
+                                        break;
+                                    } else if counter_quantity == current_order.get_quantity() {
+                                        // fully execute current order
+                                        // fully execute counter order
+                                        Self::fully_execute_order(counter_order,
+                                                                  &current_order.clone(),
+                                                                  trading_asset_id.clone(),
+                                                                  base_asset_id.clone(),
+                                                                  false,
+                                                                  &current_order.get_order_type());
+                                        // Remove both orders
+                                        matched = true;
+                                        break;
+                                    } else {
+                                        // partially execute current order
+                                        current_order = Self::partially_execute_order(current_order.clone(),
+                                                                                      &counter_order,
+                                                                                      trading_asset_id.clone(),
+                                                                                      base_asset_id.clone(),
+                                                                                      true,
+                                                                                      &current_order.get_order_type());
+                                        // pop another order from queue or insert new bid in bids
                                     }
                                 }
+
                                 if matched {
                                     // current order executed completely
                                     // save the state and exit
@@ -545,44 +545,42 @@ impl<T: Trait> Module<T> {
                                 // There are orders and counter_price_level matches asked_price_level
                                 let orders = counter_price_level.get_orders_mut();
                                 let mut matched = false;
-                                for index in 0..orders.len() {
-                                    if let Some(mut counter_order) = orders.remove(index) {
-                                        let counter_quantity = counter_order.get_quantity();
-                                        if counter_quantity > current_order.get_quantity() {
-                                            // partially execute counter order
-                                            counter_order = Self::partially_execute_order(counter_order,
-                                                                                          &current_order.clone(),
-                                                                                          trading_asset_id.clone(),
-                                                                                          base_asset_id.clone(),
-                                                                                          true,
-                                                                                          &current_order.get_order_type());
-                                            // push front the remaining counter order
-                                            orders.push_front(counter_order);
-                                            matched = true;
-                                            break;
-                                        } else if counter_quantity == current_order.get_quantity() {
-                                            // fully execute current order
-                                            // fully execute counter order
-                                            Self::fully_execute_order(counter_order,
-                                                                      &current_order.clone(),
-                                                                      trading_asset_id.clone(),
-                                                                      base_asset_id.clone(),
-                                                                      true,
-                                                                      &current_order.get_order_type());
-                                            // Remove both orders
-                                            matched = true;
-                                            break;
-                                        } else {
-                                            // partially execute current order
-                                            // TODO: Price taken for calculation maybe wrong. Check it
-                                            current_order = Self::partially_execute_order(current_order.clone(),
-                                                                                          &counter_order,
-                                                                                          trading_asset_id.clone(),
-                                                                                          base_asset_id.clone(),
-                                                                                          false,
-                                                                                          &current_order.get_order_type());
-                                            // pop another order from queue or insert new bid in bids
-                                        }
+                                while let Some(mut counter_order) = orders.pop_front() {
+                                    let counter_quantity = counter_order.get_quantity();
+                                    if counter_quantity > current_order.get_quantity() {
+                                        // partially execute counter order
+                                        counter_order = Self::partially_execute_order(counter_order,
+                                                                                      &current_order.clone(),
+                                                                                      trading_asset_id.clone(),
+                                                                                      base_asset_id.clone(),
+                                                                                      true,
+                                                                                      &current_order.get_order_type());
+                                        // push front the remaining counter order
+                                        orders.push_front(counter_order);
+                                        matched = true;
+                                        break;
+                                    } else if counter_quantity == current_order.get_quantity() {
+                                        // fully execute current order
+                                        // fully execute counter order
+                                        Self::fully_execute_order(counter_order,
+                                                                  &current_order.clone(),
+                                                                  trading_asset_id.clone(),
+                                                                  base_asset_id.clone(),
+                                                                  true,
+                                                                  &current_order.get_order_type());
+                                        // Remove both orders
+                                        matched = true;
+                                        break;
+                                    } else {
+                                        // partially execute current order
+                                        // TODO: Price taken for calculation maybe wrong. Check it
+                                        current_order = Self::partially_execute_order(current_order.clone(),
+                                                                                      &counter_order,
+                                                                                      trading_asset_id.clone(),
+                                                                                      base_asset_id.clone(),
+                                                                                      false,
+                                                                                      &current_order.get_order_type());
+                                        // pop another order from queue or insert new bid in bids
                                     }
                                 }
                                 if matched {
@@ -642,48 +640,48 @@ impl<T: Trait> Module<T> {
                                 return order_book;
                             }
                         }
-                        for index in 0..orders.len() {
-                            if let Some(mut counter_order) = orders.remove(index) {
-                                let counter_quantity = counter_order.get_quantity();
-                                if counter_quantity > current_order.get_quantity() {
-                                    // partially execute counter order
-                                    amount_filled.checked_add(current_order.get_quantity());
-                                    counter_order = Self::partially_execute_order(counter_order,
-                                                                                  &current_order.clone(),
-                                                                                  trading_asset_id.clone(),
-                                                                                  base_asset_id.clone(),
-                                                                                  true,
-                                                                                  &current_order.get_order_type());
-                                    // push front the remaining counter order
-                                    orders.push_front(counter_order);
-                                    matched = true;
-                                    break;
-                                } else if counter_quantity == current_order.get_quantity() {
-                                    // fully execute current order
-                                    // fully execute counter order
-                                    amount_filled.checked_add(current_order.get_quantity());
-                                    Self::fully_execute_order(counter_order,
-                                                              &current_order,
-                                                              trading_asset_id.clone(),
-                                                              base_asset_id.clone(),
-                                                              true,
-                                                              &current_order.get_order_type());
-                                    // Remove both orders
-                                    matched = true;
-                                    break;
-                                } else {
-                                    // partially execute current order
-                                    amount_filled.checked_add(counter_order.get_quantity());
-                                    current_order = Self::partially_execute_order(current_order.clone(),
-                                                                                  &counter_order,
-                                                                                  trading_asset_id.clone(),
-                                                                                  base_asset_id.clone(),
-                                                                                  false,
-                                                                                  &current_order.get_order_type());
-                                    // pop another order from queue or insert new bid in bids
-                                }
+
+                        while let Some(mut counter_order) = orders.pop_front() {
+                            let counter_quantity = counter_order.get_quantity();
+                            if counter_quantity > current_order.get_quantity() {
+                                // partially execute counter order
+                                amount_filled.checked_add(current_order.get_quantity());
+                                counter_order = Self::partially_execute_order(counter_order,
+                                                                              &current_order.clone(),
+                                                                              trading_asset_id.clone(),
+                                                                              base_asset_id.clone(),
+                                                                              true,
+                                                                              &current_order.get_order_type());
+                                // push front the remaining counter order
+                                orders.push_front(counter_order);
+                                matched = true;
+                                break;
+                            } else if counter_quantity == current_order.get_quantity() {
+                                // fully execute current order
+                                // fully execute counter order
+                                amount_filled.checked_add(current_order.get_quantity());
+                                Self::fully_execute_order(counter_order,
+                                                          &current_order,
+                                                          trading_asset_id.clone(),
+                                                          base_asset_id.clone(),
+                                                          true,
+                                                          &current_order.get_order_type());
+                                // Remove both orders
+                                matched = true;
+                                break;
+                            } else {
+                                // partially execute current order
+                                amount_filled.checked_add(counter_order.get_quantity());
+                                current_order = Self::partially_execute_order(current_order.clone(),
+                                                                              &counter_order,
+                                                                              trading_asset_id.clone(),
+                                                                              base_asset_id.clone(),
+                                                                              false,
+                                                                              &current_order.get_order_type());
+                                // pop another order from queue or insert new bid in bids
                             }
                         }
+
                         if matched {
                             // current order executed completely
                             // save the state and exit
@@ -716,48 +714,47 @@ impl<T: Trait> Module<T> {
                         // There are orders and counter_price_level matches asked_price_level
                         let orders = counter_price_level.get_orders_mut();
                         let mut matched = false;
-                        for index in 0..orders.len() {
-                            if let Some(mut counter_order) = orders.remove(index) {
-                                let counter_quantity = counter_order.get_quantity();
-                                if counter_quantity > current_order.get_quantity() {
-                                    // partially execute counter order
-                                    amount_filled.checked_add(current_order.get_quantity());
-                                    counter_order = Self::partially_execute_order(counter_order,
-                                                                                  &current_order.clone(),
-                                                                                  trading_asset_id.clone(),
-                                                                                  base_asset_id.clone(),
-                                                                                  true,
-                                                                                  &current_order.get_order_type());
-                                    // push front the remaining counter order
-                                    orders.push_front(counter_order);
-                                    matched = true;
-                                    break;
-                                } else if counter_quantity == current_order.get_quantity() {
-                                    // fully execute current order
-                                    // fully execute counter order
-                                    amount_filled.checked_add(current_order.get_quantity());
-                                    Self::fully_execute_order(counter_order,
-                                                              &current_order,
-                                                              trading_asset_id.clone(),
-                                                              base_asset_id.clone(),
-                                                              true,
-                                                              &current_order.get_order_type());
-                                    // Remove both orders
-                                    matched = true;
-                                    break;
-                                } else {
-                                    // partially execute current order
-                                    amount_filled.checked_add(counter_order.get_quantity());
-                                    current_order = Self::partially_execute_order(current_order.clone(),
-                                                                                  &counter_order,
-                                                                                  trading_asset_id.clone(),
-                                                                                  base_asset_id.clone(),
-                                                                                  false,
-                                                                                  &current_order.get_order_type());
-                                    // pop another order from queue or insert new bid in bids
-                                }
+                        while let Some(mut counter_order) = orders.pop_front() {
+                            let counter_quantity = counter_order.get_quantity();
+                            if counter_quantity > current_order.get_quantity() {
+                                // partially execute counter order
+                                amount_filled.checked_add(current_order.get_quantity());
+                                counter_order = Self::partially_execute_order(counter_order,
+                                                                              &current_order.clone(),
+                                                                              trading_asset_id.clone(),
+                                                                              base_asset_id.clone(),
+                                                                              true,
+                                                                              &current_order.get_order_type());
+                                // push front the remaining counter order
+                                orders.push_front(counter_order);
+                                matched = true;
+                                break;
+                            } else if counter_quantity == current_order.get_quantity() {
+                                // fully execute current order
+                                // fully execute counter order
+                                amount_filled.checked_add(current_order.get_quantity());
+                                Self::fully_execute_order(counter_order,
+                                                          &current_order,
+                                                          trading_asset_id.clone(),
+                                                          base_asset_id.clone(),
+                                                          true,
+                                                          &current_order.get_order_type());
+                                // Remove both orders
+                                matched = true;
+                                break;
+                            } else {
+                                // partially execute current order
+                                amount_filled.checked_add(counter_order.get_quantity());
+                                current_order = Self::partially_execute_order(current_order.clone(),
+                                                                              &counter_order,
+                                                                              trading_asset_id.clone(),
+                                                                              base_asset_id.clone(),
+                                                                              false,
+                                                                              &current_order.get_order_type());
+                                // pop another order from queue or insert new bid in bids
                             }
                         }
+
                         if matched {
                             // current order executed completely
                             // save the state and exit
@@ -1118,7 +1115,12 @@ impl<T: Trait> Module<T> {
         Self::convert_balance_to_fixed_u128(pallet_generic_asset::Module::<T>::free_balance(&asset_id, who))
     }
 
-    pub fn get_order_book(trading_pair: u32) -> apis::OrderBookApi{
+    pub fn get_order_book_testing(trading_pair: u32) -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
+        let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
+        return order_book;
+    }
+
+    pub fn get_order_book(trading_pair: u32) -> apis::OrderBookApi {
         if !(<Books<T>>::contains_key(trading_pair)) {
             let order_book_data = apis::OrderBookApi {
                 bids: Vec::with_capacity(0),
