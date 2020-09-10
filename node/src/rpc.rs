@@ -56,9 +56,10 @@ pub fn create_full<C, P>(
 		TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
 	);
 
-	io.extend_with(dex_rpc::DexApi::to_delegate(
-		dex_rpc::DEX::new(client),
-	));
+	//	TODO: Implement this RPC. There is some error
+	// io.extend_with(dex_rpc::DexApi::to_delegate(
+	// 	dex_rpc::DEX::new(client),
+	// ));
 
 	// Extend this RPC with a custom API by using the following syntax.
 	// `YourRpcStruct` should have a reference to a client, which is needed

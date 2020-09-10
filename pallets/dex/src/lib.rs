@@ -1124,7 +1124,6 @@ impl<T: Trait> Module<T> {
             let order_book_data = apis::OrderBookApi {
                 bids: Vec::with_capacity(0),
                 asks: Vec::with_capacity(0),
-                market_data: Vec::with_capacity(0),
                 enabled: false,
             };
             return order_book_data;
@@ -1134,7 +1133,6 @@ impl<T: Trait> Module<T> {
         let mut order_book_data = apis::OrderBookApi {
             bids: Vec::with_capacity(10),
             asks: Vec::with_capacity(10),
-            market_data: Vec::with_capacity(10),
             enabled: true,
         };
         // Computing Asks Amount
