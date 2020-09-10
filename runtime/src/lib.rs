@@ -648,7 +648,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl dex::DexApi<Block> for Runtime {
+	impl dex::DexRuntimeApi<Block> for Runtime {
 		fn get_order_book(trading_pair: u32) -> dex::apis::OrderBookApi{
 			DEX::get_order_book(trading_pair)
 		}

@@ -13,6 +13,7 @@ use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_block_builder::BlockBuilder;
 pub use sc_rpc_api::DenyUnsafe;
 use sp_transaction_pool::TransactionPool;
+use dex_rpc;
 
 
 /// Full client dependencies.
@@ -54,6 +55,10 @@ pub fn create_full<C, P>(
 	io.extend_with(
 		TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
 	);
+
+	io.extend_with(dex_rpc::DexApi::to_delegate(
+		dex_rpc::DEX::new(client),
+	));
 
 	// Extend this RPC with a custom API by using the following syntax.
 	// `YourRpcStruct` should have a reference to a client, which is needed

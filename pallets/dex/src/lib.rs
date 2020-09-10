@@ -9,7 +9,6 @@ use frame_support::sp_runtime::offchain::storage_lock::BlockNumberProvider;
 use frame_support::traits::Get;
 use frame_system::ensure_signed;
 use pallet_generic_asset::AssetIdProvider;
-use sp_api::decl_runtime_apis;
 use sp_arithmetic::{FixedPointNumber, FixedU128};
 use sp_arithmetic::traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Saturating, UniqueSaturatedFrom};
 use sp_std::collections::btree_map;
@@ -1178,8 +1177,10 @@ impl<T: Trait> Module<T> {
     }
 }
 
-decl_runtime_apis! {
-    pub trait DexApi {
-    fn get_order_book(trading_pair: u32) ->  apis::OrderBookApi;
+
+sp_api::decl_runtime_apis! {
+    pub trait DexRuntimeApi {
+        fn get_order_book(trading_pair: u32) -> apis::OrderBookApi;
     }
+
 }
