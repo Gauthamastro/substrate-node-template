@@ -155,23 +155,21 @@ decl_module! {
 		#[weight = 10000]
 		pub fn register_new_orderbook(origin, trading_asset_id: u32, base_asset_id: u32) -> dispatch::DispatchResultWithPostInfo{
 		let _trader = ensure_signed(origin)?;
-		// TODO: Save the AssetIds check if it's valid and create the the orderbook for the given
-		// TODO: pair
 
 
-		// If assets ids are same then it's error
+		/// If assets ids are same then it's error
 		if &trading_asset_id == &base_asset_id {
 		Self::deposit_event(RawEvent::SameAssetIdsError(trading_asset_id, base_asset_id));
 		return Err(<Error<T>>::SameAssetIdsError.into());
 		}
-		// The origin should have a non-zero balance in both assets
+		/// The origin should have a non-zero balance in either one asset.
 		let trading_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(trading_asset_id), &_trader);
 		let base_asset_balance = pallet_generic_asset::Module::<T>::free_balance(&Self::u32_to_asset_id(base_asset_id), &_trader);
 		if (TryInto::<u128>::try_into(trading_asset_balance).ok().unwrap()>0) || (TryInto::<u128>::try_into(base_asset_balance).ok().unwrap()>0){
-		// The origin should reserve a certain amount of SpendingAssetCurrency for registering the pair
+		/// The origin should reserve a certain amount of SpendingAssetCurrency for registering the pair
 
 		if Self::reserve_balance_registration(&_trader){
-		// Create the orderbook
+		/// Create the orderbook
 		let trading_pair_id = Self::create_order_book(Self::u32_to_asset_id(trading_asset_id),Self::u32_to_asset_id(base_asset_id));
 		Self::deposit_event(RawEvent::TradingPairCreated(trading_pair_id));
 		return Ok(Some(0).into());
@@ -212,7 +210,7 @@ decl_module! {
 		Ok(Some(0).into())
 		}
 
-		// This function can be used to cancel orders
+		/// This function can be used to cancel orders
 		#[weight = 10000]
 		pub fn cancel_order(origin, order_id: sp_std::vec::Vec<u8>) -> dispatch::DispatchResult{
 		let _trader = ensure_signed(origin)?;
@@ -223,11 +221,7 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // fn encode_and_update_nonce() -> Vec<u8> {
-    //     let nonce = Nonce::get();
-    //     Nonce::put(nonce.wrapping_add(1));
-    //     nonce.encode()
-    // }
+    /// Initializes new Orderbook struct and saves it to storage with given current_id as key.
     fn create_order_book(trading_asset_id: T::AssetId, base_asset_id: T::AssetId) -> u32 {
         let current_id = Self::book_id();
         let current_block_num = <frame_system::Module<T>>::current_block_number();
@@ -256,11 +250,15 @@ impl<T: Trait> Module<T> {
         return tradingpair;
     }
 
+
+    /// Reserves UNIT (defined in configuration trait) balance of SpendingAssetCurrency
     fn reserve_balance_registration(origin: &<T as frame_system::Trait>::AccountId) -> bool {
         pallet_generic_asset::Module::<T>::reserve(
             &pallet_generic_asset::SpendingAssetIdProvider::<T>::asset_id(),
-            origin, <T as Trait>::UNIT::get()).is_ok()   // TODO: Fix a new amount using Configuration Trait
+            origin, <T as Trait>::UNIT::get()).is_ok()
     }
+
+    // Converts Rust primitive type u32 to pallet_generic_asset type AssetId
     fn u32_to_asset_id(input: u32) -> T::AssetId {
         input.into()
     }
@@ -274,6 +272,8 @@ impl<T: Trait> Module<T> {
     /// Note: Price is in (base_asset/trading_asset) and Quantity is in trading_asset
     /// Trading pair notation: trading_asset/base_asset ie (BTC/USDT)
     /// Price is BTC/USDT and Quantity is BTC
+    /// Note orderbook is only retrieved from storage if all the checks are passed.
+    /// Reads and Writes to Substrate Storage is super expensive. :-|
     fn basic_order_checks(origin: &<T as frame_system::Trait>::AccountId, trading_pair: u32,
                           price: FixedU128, quantity: FixedU128, order_type: engine::OrderType,
                           order_id: sp_std::vec::Vec<u8>) -> Option<engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>> {
@@ -415,6 +415,22 @@ impl<T: Trait> Module<T> {
         }
     }
 
+    /// The trading algorithm lives here
+    /// The idea is that if the incoming order is Bidlimit then load the asks(minimum Binaryheap)
+    /// and check if there are any others that are at the same price or lower than bidLimit order's price
+    /// if so take those asks orders in a FIFO fashion and execute against Bidlimit order
+    /// In case of no matching prices or asks is empty or BidLimit order is partially fulfilled
+    /// then push Bidlimit order to it's pricelevel in bids (maximum BinaryHeap).
+    ///
+    /// For AskLimit orders... load the bids (maximum BinaryHeap) and try to find price that are same
+    /// or greater than AskLimit order's price, then execute in FIFO fashion. Finally similar to Bidlimit
+    /// in case of not matching prices or empty bids BinaryHeap or AskLimit order is partially fulfilled
+    /// add it to asks at it's pricelevel.
+    ///
+    ///
+    /// For Market Orders, it is similar to BidLimit and AskLimit respectively, only difference is
+    /// in case of order partially filled or no matching price level or corresponding BinaryHeap's empty
+    /// then it will not be added to orderbook but discarded with a event to notify the users.
     fn execute_normal_order(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
                             order_type: engine::OrderType,
                             order_id: sp_std::vec::Vec<u8>,
@@ -770,6 +786,7 @@ impl<T: Trait> Module<T> {
                         break;
                     }
                 }
+
                 if amount_filled > FixedU128::from(0) {
                     Self::deposit_event(RawEvent::MarketSell(amount_filled));
                 }
@@ -782,21 +799,25 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    // For the sake of understanding
+    /// For the sake of understanding
     fn partially_execute_order(executing_order: engine::Order<T::AccountId, T::BlockNumber>,
                                trigger_order: &engine::Order<T::AccountId, T::BlockNumber>,
                                trading_asset_id: T::AssetId,
                                base_asset_id: T::AssetId,
                                take_price_from_executing_order: bool,
                                order_type: &engine::OrderType) -> Order<T::AccountId, T::BlockNumber> {
+
         return Self::fully_execute_order(executing_order, trigger_order, trading_asset_id, base_asset_id, take_price_from_executing_order, order_type);
     }
 
+    /// Here we un-reserve the corresponding assets of both buyer and seller and transfers their
+    /// balances according trade amount or quantity.
     fn fully_execute_order(mut executing_order: engine::Order<T::AccountId, T::BlockNumber>,
                            trigger_order: &engine::Order<T::AccountId, T::BlockNumber>,
                            trading_asset_id: T::AssetId,
                            base_asset_id: T::AssetId,
-                           take_price_from_executing_order: bool,
+                           take_price_from_executing_order: bool, // It is used to differentiate incoming order
+                                                                  // and counter order from orderbook
                            order_type: &engine::OrderType) -> Order<T::AccountId, T::BlockNumber> {
         return match order_type { // TODO: Check this
             engine::OrderType::BidLimit => {
@@ -1001,13 +1022,15 @@ impl<T: Trait> Module<T> {
         };
     }
 
+    /// Adds the given current_order to the bids of given orderbook.
+    /// P.S. : Super Slow implementation :-\
     fn add_to_bids(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
                    current_order: Order<T::AccountId, T::BlockNumber>)
                    -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
-        Self::deposit_event(RawEvent::AsksHeapEmpty); // TODO: Better Naming of Events. It can be Order not matched in AsksHeap
+        Self::deposit_event(RawEvent::AsksHeapEmpty); // TODO: Better Naming of Events. It can also be Order not matched in AsksHeap
         let bids = order_book.clone().get_bids();
         let mut price_level_match = true;
-        let mut bids_sorted_vec = bids.into_sorted_vec(); //TODO: This is going to be super duper expensive.
+        let mut bids_sorted_vec = bids.into_sorted_vec(); //TODO: CHANGE THIS: This is going to be super duper expensive.
         for index in 0..bids_sorted_vec.len() {
             if bids_sorted_vec[index].get_price_level() != current_order.get_price() {
                 // current_order price and price_level doesn't match
@@ -1023,7 +1046,7 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        //TODO: This is going to be super duper expensive.
+        //TODO: CHANGE THIS: This is going to be super duper expensive.
         let mut modified_bids = binary_heap::BinaryHeap::from(bids_sorted_vec);
 
         if modified_bids.is_empty() && price_level_match == true {
@@ -1052,6 +1075,8 @@ impl<T: Trait> Module<T> {
         order_book
     }
 
+    /// Adds the given current_order to the asks of given orderbook.
+    /// P.S. : Super Slow implementation :-\
     fn add_to_asks(mut order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId>,
                    current_order: Order<T::AccountId, T::BlockNumber>)
                    -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
@@ -1103,6 +1128,7 @@ impl<T: Trait> Module<T> {
         order_book
     }
 
+    /// Helper function
     pub fn calculate_trade_amount(price: &FixedU128, quantity: &FixedU128) -> T::Balance {
         let trade_amount: T::Balance = Self::convert_fixed_u128_to_balance(
             price.checked_mul(
@@ -1110,15 +1136,18 @@ impl<T: Trait> Module<T> {
         return trade_amount;
     }
 
+    /// Helper function
     pub fn get_user_balance(who: &<T as frame_system::Trait>::AccountId, asset_id: T::AssetId) -> Option<FixedU128> {
         Self::convert_balance_to_fixed_u128(pallet_generic_asset::Module::<T>::free_balance(&asset_id, who))
     }
 
+    /// Helper function
     pub fn get_order_book_testing(trading_pair: u32) -> engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> {
         let order_book: engine::OrderBook<T::AccountId, T::BlockNumber, T::AssetId> = <Books<T>>::get(trading_pair);
         return order_book;
     }
 
+    /// Helper function for implementing RPC that gets the orderbook from storage
     pub fn get_order_book(trading_pair: u32) -> apis::OrderBookApi {
         if !(<Books<T>>::contains_key(trading_pair)) {
             let order_book_data = apis::OrderBookApi {
@@ -1175,7 +1204,7 @@ impl<T: Trait> Module<T> {
     }
 }
 
-
+/// Macro related to accessing orderbook from Substrate Runtime for RPC
 sp_api::decl_runtime_apis! {
     pub trait DexRuntimeApi {
         fn get_order_book(trading_pair: u32) -> apis::OrderBookApi;

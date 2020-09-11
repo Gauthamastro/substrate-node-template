@@ -8,23 +8,14 @@ use sp_std::collections::btree_map;
 
 pub type TradingPair = u32;
 
+/// The available order types for the first version.
 #[derive(Encode, Decode, Clone, Eq, PartialEq, Debug)]
 pub enum OrderType {
     BidLimit,
     BidMarket,
-    // BidStopLimit,
-    // BidStopMarket,
-    // BidStopLoss,
-    // BidFillKill,
-
-    // PostOnly,
 
     AskLimit,
     AskMarket,
-    // AskStopLimit,
-    // AskStopMarket,
-    // AskStopLoss,
-    // AskFillKill,
 
     None,
 }
@@ -33,16 +24,16 @@ impl Default for OrderType {
     fn default() -> Self { OrderType::None }
 }
 
-
+/// The representation of Order in this pallet
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
 pub struct Order<AccountId, BlockNumber> {
-    pub(crate) id: Vec<u8>,
-    pub(crate) order_type: OrderType,
-    pub(crate) price: FixedU128,
-    pub(crate) quantity: FixedU128,
-    pub(crate) market_maker: bool,
-    pub(crate) origin: AccountId,
-    pub(crate) expiry: BlockNumber,
+    pub(crate) id: Vec<u8>, // unique id that identifies a order
+    pub(crate) order_type: OrderType, // order type
+    pub(crate) price: FixedU128, // Fixed Point representation of order price
+    pub(crate) quantity: FixedU128, // Fixed Point representation of order quantity
+    pub(crate) market_maker: bool, // used for advanced not needed for Limit and Market
+    pub(crate) origin: AccountId, // trader account which placed this order
+    pub(crate) expiry: BlockNumber, // used for advanced not needed for Limit and Market
 }
 
 impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
@@ -75,6 +66,10 @@ impl<AccountId, BlockNumber> Order<AccountId, BlockNumber> {
     }
 }
 
+/// It is used to define the different price levels in the BinaryHeap.
+/// All orders are grouped together based on their prices
+/// queue: it contains a FIFO queue and new orders are to back of it and executed from front of the
+/// queue. It gives a sense of price-time priority execution of trades.
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct PriceLevel<AccountId, BlockNumber> {
     pub(crate) price_level: FixedU128,
@@ -118,20 +113,27 @@ impl<AccountId, BlockNumber> Eq for PriceLevel<AccountId, BlockNumber> {}
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
 pub struct OrderBook<AccountId, BlockNumber, AssetId> {
+    // Unique ID that identifies a orderbook in storage
     pub(crate) id: TradingPair,
-    // notation: String BTC/ETH
-    pub(crate) trading_asset: AssetId,
+    // notation BTC/ETH
     // BTC -- AssetId from GenericAsset
-    pub(crate) base_asset: AssetId,
+    pub(crate) trading_asset: AssetId,  // pallet_generic_asset AssetID for trading asset
     // ETH -- AssetId from GenericAsset
-    pub(crate) nonce: u64,
+    pub(crate) base_asset: AssetId, // pallet_generic_asset AssetID for trading asset
+    pub(crate) nonce: u64, // Relic from previous version. Not used.
+    // Contains all the active orders, orders are removed once they are cancelled or fulfilled completely
     pub(crate) orders: btree_map::BTreeMap<Vec<u8>, Order<AccountId, BlockNumber>>,
+    // Advanced orders are not needed now. Just leave it here.
+    // It is going to be used in the future.
     pub(crate) advanced_bid_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
     pub(crate) advanced_ask_orders: BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>,
+    // maximum BinaryHeap of Pricelevel Struct for Bid orders
     pub(crate) bids: BinaryHeap<PriceLevel<AccountId, BlockNumber>>,
+    // minimum BinaryHeap of Pricelevel Struct for asks orders
     pub(crate) asks: BinaryHeap<PriceLevel<AccountId, BlockNumber>, MinComparator>,
+    // To store closing_ask_price, closing_bid_price and volume of trades executed between blocks
     pub(crate) market_data: Vec<MarketData<BlockNumber>>,
-    pub(crate) enabled: bool,
+    pub(crate) enabled: bool,  // Relic from previous version. Not need per say.
 }
 
 impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId> {
@@ -178,10 +180,10 @@ impl<AccountId, BlockNumber, AssetId> OrderBook<AccountId, BlockNumber, AssetId>
 
 #[derive(Encode, Decode, Clone, Debug, Default)]
 pub struct MarketData<BlockNumber> {
-    pub(crate) current_block: BlockNumber,
+    pub(crate) current_block: BlockNumber, // Data Included is for this block number
     pub(crate) closing_bid: FixedU128,
     pub(crate) closing_ask: FixedU128,
-    pub(crate) volume: FixedU128,
+    pub(crate) volume: FixedU128, // Total volume of trades executed in this block ( total quantity traded in trading_asset)
 }
 
 
